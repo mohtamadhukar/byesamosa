@@ -1,0 +1,28 @@
+[project]
+name = "byesamosa"
+version = "0.1.0"
+description = "Personal Oura Ring data analyzer with AI-powered insights"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas",
+    "anthropic",
+    "pydantic>=2.0",
+    "pydantic-settings",
+    "python-dotenv",
+    "streamlit",
+    "plotly",
+]
+
+[project.scripts]
+byesamosa = "byesamosa.pipeline:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/byesamosa"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

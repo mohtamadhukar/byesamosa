@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ByeSamosa — Scores V3: Body Status Report</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --card-border: #2a2d3a;
+    --text: #e4e4e7;
+    --text-muted: #71717a;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --orange: #f97316;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+    --yellow: #eab308;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    padding: 32px;
+  }
+  .mockup-banner {
+    text-align: center; padding: 10px; margin-bottom: 24px;
+    background: rgba(249,115,22,0.08); border: 1px dashed rgba(249,115,22,0.3);
+    border-radius: 10px; font-size: 12px; color: var(--orange); letter-spacing: 0.5px;
+  }
+  .version-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--purple); margin-bottom: 8px; }
+  .version-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .version-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; max-width: 700px; }
+
+  /* Body report grid */
+  .report-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 20px;
+  }
+
+  /* Left: single composite + status */
+  .composite-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .composite-ring {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    margin-bottom: 20px;
+  }
+  .composite-ring svg { width: 180px; height: 180px; }
+  .comp-bg { fill: none; stroke: #2a2d3a; stroke-width: 8; }
+  .comp-sleep { fill: none; stroke: var(--blue); stroke-width: 8; stroke-linecap: round; }
+  .comp-readiness { fill: none; stroke: var(--green); stroke-width: 8; stroke-linecap: round; }
+  .comp-activity { fill: none; stroke: var(--orange); stroke-width: 8; stroke-linecap: round; }
+  .comp-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .comp-score {
+    font-size: 48px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, var(--green), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .comp-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: -2px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .status-optimal {
+    background: rgba(34,197,94,0.1);
+    color: var(--green);
+    border: 1px solid rgba(34,197,94,0.2);
+  }
+  .status-pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .comp-breakdown {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .comp-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 6px 0;
+  }
+  .comp-row-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .comp-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .comp-row-score { font-weight: 700; font-size: 15px; }
+
+  .percentile-note {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--card-border);
+    line-height: 1.5;
+  }
+
+  /* Right: status tiles */
+  .status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 16px;
+  }
+  .status-tile {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .tile-category {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .tile-verdict {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .tile-detail {
+    font-size: 12px;
+    color: #a1a1aa;
+    line-height: 1.6;
+  }
+  .tile-detail strong { color: var(--text); font-weight: 500; }
+
+  /* Heatmap dots at bottom of tiles */
+  .tile-heatmap {
+    display: flex;
+    gap: 3px;
+    margin-top: 14px;
+  }
+  .hm-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    opacity: 0.7;
+  }
+  .hm-dot:last-child { opacity: 1; }
+
+  /* Corner glow */
+  .tile-glow {
+    position: absolute;
+    top: -30px;
+    right: -30px;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    filter: blur(40px);
+    opacity: 0.1;
+  }
+
+  /* Signal icons */
+  .signal-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .signal {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-banner">MOCKUP — Score Section Variant</div>
+
+<div class="version-label">Version 3</div>
+<div class="version-title">Body Status Report — Single Composite + System Tiles</div>
+<div class="version-desc">
+  One opinionated composite score ("how's my body doing overall?") with a multi-ring breakdown.
+  Four system tiles give a quick verdict for each body system — recovery, sleep quality, physical load, and autonomic health — each with a 7-day heatmap showing the trend.
+</div>
+
+<div class="report-grid">
+  <!-- Left: Composite -->
+  <div class="composite-card">
+    <div class="status-badge status-optimal">
+      <div class="status-pulse"></div>
+      OPTIMAL
+    </div>
+
+    <div class="composite-ring">
+      <!-- Triple ring: outer=sleep, mid=readiness, inner=activity -->
+      <svg viewBox="0 0 180 180">
+        <!-- Outer ring: Sleep (85%) -->
+        <circle class="comp-bg" cx="90" cy="90" r="82"/>
+        <circle class="comp-sleep" cx="90" cy="90" r="82"
+          stroke-dasharray="515.2" stroke-dashoffset="77.3"
+          transform="rotate(-90 90 90)"/>
+        <!-- Mid ring: Readiness (90%) -->
+        <circle class="comp-bg" cx="90" cy="90" r="68" stroke-width="7"/>
+        <circle class="comp-readiness" cx="90" cy="90" r="68"
+          stroke-dasharray="427.3" stroke-dashoffset="42.7" stroke-width="7"
+          transform="rotate(-90 90 90)"/>
+        <!-- Inner ring: Activity (70%) -->
+        <circle class="comp-bg" cx="90" cy="90" r="55" stroke-width="6"/>
+        <circle class="comp-activity" cx="90" cy="90" r="55"
+          stroke-dasharray="345.6" stroke-dashoffset="103.7" stroke-width="6"
+          transform="rotate(-90 90 90)"/>
+      </svg>
+      <div class="comp-center">
+        <div class="comp-score">82</div>
+        <div class="comp-label">overall</div>
+      </div>
+    </div>
+
+    <div class="comp-breakdown">
+      <div class="comp-row">
+        <div class="comp-row-left">
+          <div class="comp-dot" style="background:var(--blue)"></div>
+          <span>Sleep</span>
+        </div>
+        <span class="comp-row-score" style="color:var(--blue)">85</span>
+      </div>
+      <div class="comp-row">
+        <div class="comp-row-left">
+          <div class="comp-dot" style="background:var(--green)"></div>
+          <span>Readiness</span>
+        </div>
+        <span class="comp-row-score" style="color:var(--green)">90</span>
+      </div>
+      <div class="comp-row">
+        <div class="comp-row-left">
+          <div class="comp-dot" style="background:var(--orange)"></div>
+          <span>Activity</span>
+        </div>
+        <span class="comp-row-score" style="color:var(--orange)">70</span>
+      </div>
+    </div>
+
+    <div class="percentile-note">
+      This is your <strong style="color:var(--text)">78th percentile</strong> day out of the last 90 days.
+    </div>
+  </div>
+
+  <!-- Right: 4 status tiles -->
+  <div class="status-grid">
+
+    <!-- Recovery -->
+    <div class="status-tile">
+      <div class="tile-glow" style="background:var(--green)"></div>
+      <div class="tile-category">Recovery</div>
+      <div class="tile-verdict" style="color:var(--green)">Fully recovered</div>
+      <div class="tile-detail">
+        HRV <strong>52ms</strong> (+4 vs baseline), resting HR <strong>54 bpm</strong> (-2). Recovery index is in the top quartile of your 30-day range.
+      </div>
+      <div class="signal-row">
+        <span class="signal" style="color:var(--green)">&#9650; HRV trending up</span>
+        <span class="signal" style="color:var(--green)">&#9660; RHR trending down</span>
+      </div>
+      <div class="tile-heatmap">
+        <div class="hm-dot" style="background:var(--orange)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--yellow)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+      </div>
+    </div>
+
+    <!-- Sleep Quality -->
+    <div class="status-tile">
+      <div class="tile-glow" style="background:var(--blue)"></div>
+      <div class="tile-category">Sleep Quality</div>
+      <div class="tile-verdict" style="color:var(--blue)">Deep strong, REM light</div>
+      <div class="tile-detail">
+        <strong>1h 18m deep</strong> (best in 14 days). REM at <strong>1h 34m</strong> is 8m below your norm — likely from late exercise elevating cortisol.
+      </div>
+      <div class="signal-row">
+        <span class="signal" style="color:var(--green)">&#9650; deep sleep</span>
+        <span class="signal" style="color:var(--orange)">&#9660; REM</span>
+        <span class="signal" style="color:var(--green)">92% efficiency</span>
+      </div>
+      <div class="tile-heatmap">
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--blue)"></div>
+        <div class="hm-dot" style="background:var(--yellow)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--blue)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--blue)"></div>
+      </div>
+    </div>
+
+    <!-- Physical Load -->
+    <div class="status-tile">
+      <div class="tile-glow" style="background:var(--orange)"></div>
+      <div class="tile-category">Physical Load</div>
+      <div class="tile-verdict" style="color:var(--orange)">Below your pace</div>
+      <div class="tile-detail">
+        <strong>6,240 steps</strong> and <strong>420 cal</strong> — you've been 24% below your step average for 5 days. Body is recovered enough for a big day.
+      </div>
+      <div class="signal-row">
+        <span class="signal" style="color:var(--red)">&#9660; 5-day step decline</span>
+        <span class="signal" style="color:var(--green)">capacity available</span>
+      </div>
+      <div class="tile-heatmap">
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--orange)"></div>
+        <div class="hm-dot" style="background:var(--orange)"></div>
+        <div class="hm-dot" style="background:var(--yellow)"></div>
+        <div class="hm-dot" style="background:var(--orange)"></div>
+        <div class="hm-dot" style="background:var(--orange)"></div>
+      </div>
+    </div>
+
+    <!-- Autonomic / Temperature -->
+    <div class="status-tile">
+      <div class="tile-glow" style="background:var(--cyan)"></div>
+      <div class="tile-category">Autonomic Balance</div>
+      <div class="tile-verdict" style="color:var(--cyan)">Stable & balanced</div>
+      <div class="tile-detail">
+        Temp deviation <strong>+0.1°C</strong> (within normal). Breathing rate <strong>14.8</strong> breaths/min is steady. No signs of illness or overtraining.
+      </div>
+      <div class="signal-row">
+        <span class="signal" style="color:var(--text-muted)">&#8226; temp normal</span>
+        <span class="signal" style="color:var(--text-muted)">&#8226; breath stable</span>
+      </div>
+      <div class="tile-heatmap">
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+        <div class="hm-dot" style="background:var(--green)"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

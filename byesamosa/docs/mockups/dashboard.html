@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ByeSamosa — Dashboard Mockup v3</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --card-border: #2a2d3a;
+    --text: #e4e4e7;
+    --text-muted: #71717a;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --orange: #f97316;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+    --yellow: #eab308;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    padding: 24px 32px;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+  .header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+  .header h1 span { color: var(--orange); }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .date-label { color: var(--text-muted); font-size: 14px; }
+  .refresh-btn { background: var(--card); border: 1px solid var(--card-border); color: var(--text-muted); padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  .tab-row { display: flex; gap: 4px; }
+  .tab { padding: 6px 16px; border-radius: 8px; font-size: 13px; color: var(--text-muted); cursor: pointer; border: 1px solid transparent; }
+  .tab.active { background: var(--card); color: var(--text); border-color: var(--card-border); }
+  .mockup-banner { text-align: center; padding: 10px; margin-bottom: 20px; background: rgba(249,115,22,0.08); border: 1px dashed rgba(249,115,22,0.3); border-radius: 10px; font-size: 12px; color: var(--orange); letter-spacing: 0.5px; }
+
+  /* Cards */
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 16px; padding: 24px; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+
+  /* ============================================ */
+  /*  SCORE CARDS WITH SPIDER CHARTS              */
+  /* ============================================ */
+  .scores-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .score-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .score-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 20%; right: 20%;
+    height: 2px;
+    border-radius: 0 0 4px 4px;
+  }
+  .score-card.sleep::before { background: var(--blue); }
+  .score-card.readiness::before { background: var(--green); }
+  .score-card.activity::before { background: var(--orange); }
+
+  .score-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .score-category {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .score-number-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .score-big {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  .score-delta {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 8px;
+  }
+  .delta-pos { background: rgba(34,197,94,0.12); color: var(--green); }
+  .delta-neg { background: rgba(239,68,68,0.12); color: var(--red); }
+
+  /* AI one-liner */
+  .score-insight {
+    font-size: 13px;
+    color: #a1a1aa;
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .score-insight strong { color: var(--text); font-weight: 500; }
+
+  /* Spider chart container */
+  .spider-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 4px 0 12px 0;
+  }
+  .spider-svg {
+    width: 220px;
+    height: 210px;
+  }
+  .spider-grid { fill: none; stroke: #2a2d3a; stroke-width: 0.75; }
+  .spider-axis { stroke: #2a2d3a; stroke-width: 0.5; }
+  .spider-baseline { fill: rgba(255,255,255,0.04); stroke: rgba(255,255,255,0.15); stroke-width: 1; stroke-dasharray: 3,2; }
+  .spider-today { stroke-width: 1.5; stroke-linejoin: round; }
+  .spider-label { font-size: 9.5px; fill: var(--text-muted); }
+  .spider-label-drag { fill: var(--red); font-weight: 600; }
+  .spider-label-boost { fill: var(--green); font-weight: 600; }
+  .spider-dot { stroke: var(--bg); stroke-width: 1.5; }
+
+  /* Legend under spider */
+  .spider-legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 14px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .legend-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 3px;
+    border-radius: 1px;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .legend-swatch-dash {
+    display: inline-block;
+    width: 12px;
+    height: 0;
+    border-top: 2px dashed rgba(255,255,255,0.25);
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+
+  /* "Good looks like" benchmark */
+  .good-ref {
+    font-size: 12px;
+    color: #52525b;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border-left: 2px solid #3f3f46;
+    line-height: 1.5;
+  }
+  .good-ref strong { color: var(--text-muted); font-weight: 500; }
+
+  /* ============================================ */
+  /*  AI BRIEFING                                 */
+  /* ============================================ */
+  .ai-briefing {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 20px;
+  }
+  .ai-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .ai-badge { background: linear-gradient(135deg, var(--purple), var(--blue)); color: white; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.5px; }
+  .ai-timestamp { color: var(--text-muted); font-size: 12px; }
+  .ai-body { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .ai-reasoning h4, .ai-actions h4 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+  .chain-step { background: rgba(168,85,247,0.05); border-left: 3px solid var(--purple); padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 8px; }
+  .chain-step p { font-size: 13px; line-height: 1.6; color: #c4b5fd; }
+  .chain-step p strong { color: #ddd6fe; }
+  .chain-arrow { color: var(--purple); font-size: 12px; margin: 2px 0 2px 8px; }
+  .action-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; background: rgba(255,255,255,0.02); border-radius: 10px; margin-bottom: 8px; border-left: 3px solid transparent; }
+  .action-item.a-high { border-left-color: var(--green); }
+  .action-item.a-med { border-left-color: var(--blue); }
+  .action-item.a-low { border-left-color: #3f3f46; }
+  .action-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; margin-top: 1px; }
+  .action-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .action-detail { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+  .action-tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 6px; margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* ============================================ */
+  /*  MIDDLE: HYPNOGRAM + VITALS                  */
+  /* ============================================ */
+  .mid-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; margin-bottom: 20px; }
+  .hypnogram { display: flex; flex-direction: column; gap: 0; }
+  .hypno-row { display: flex; align-items: center; gap: 12px; height: 28px; }
+  .hypno-label { font-size: 11px; color: var(--text-muted); width: 50px; text-align: right; flex-shrink: 0; }
+  .hypno-bar-track { flex: 1; height: 20px; display: flex; gap: 1px; }
+  .hypno-seg { border-radius: 2px; height: 100%; }
+  .hypno-time-axis { display: flex; justify-content: space-between; margin-left: 62px; margin-top: 8px; }
+  .hypno-time-axis span { font-size: 10px; color: var(--text-muted); }
+  .hypno-legend { display: flex; gap: 16px; margin-top: 12px; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .chart-callout { margin-top: 16px; padding: 14px 16px; background: rgba(59,130,246,0.06); border-left: 3px solid var(--blue); border-radius: 0 10px 10px 0; }
+  .chart-callout p { font-size: 12px; line-height: 1.6; color: #93c5fd; }
+  .chart-callout p strong { color: #bfdbfe; }
+
+  .vitals-stack { display: flex; flex-direction: column; gap: 12px; }
+  .vital-card { background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px 18px; }
+  .vital-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .vital-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .vital-value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .vital-unit { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+  .vital-delta { font-size: 12px; font-weight: 600; }
+  .vital-context { font-size: 12px; color: #a1a1aa; line-height: 1.5; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.04); }
+  .vital-context strong { color: var(--text); font-weight: 500; }
+  .vital-bar { height: 4px; background: #2a2d3a; border-radius: 2px; margin: 8px 0; position: relative; }
+  .vital-bar-fill { height: 100%; border-radius: 2px; position: absolute; left: 0; top: 0; }
+  .vital-bar-marker { position: absolute; top: -4px; width: 4px; height: 12px; border-radius: 2px; background: white; transform: translateX(-50%); }
+
+  /* ============================================ */
+  /*  BOTTOM: TRENDS                              */
+  /* ============================================ */
+  .trends-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .trend-chart { position: relative; height: 150px; margin-top: 8px; }
+  .trend-svg { width: 100%; height: 100%; }
+  .trend-axis-labels { display: flex; justify-content: space-between; margin-top: 6px; }
+  .trend-axis-labels span { font-size: 10px; color: var(--text-muted); }
+  .trend-legend { display: flex; gap: 16px; margin-top: 8px; }
+  .trend-annotation { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 12px; line-height: 1.5; display: flex; align-items: flex-start; gap: 8px; }
+  .trend-annotation .ann-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .trend-annotation .ann-text { color: #a1a1aa; }
+  .trend-annotation .ann-text strong { color: var(--text); font-weight: 500; }
+  .ann-green { background: rgba(34,197,94,0.06); }
+  .ann-green .ann-icon { color: var(--green); }
+
+  .footer { text-align: center; padding: 16px 0; color: var(--text-muted); font-size: 11px; border-top: 1px solid var(--card-border); margin-top: 8px; }
+
+  @media (max-width: 900px) {
+    .scores-row { grid-template-columns: 1fr; }
+    .ai-body { grid-template-columns: 1fr; }
+    .mid-grid { grid-template-columns: 1fr; }
+    .trends-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-banner">MOCKUP v3 — Spider charts + AI one-liners + "Good looks like" benchmarks</div>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>bye<span>samosa</span></h1>
+  <div class="header-right">
+    <div class="tab-row">
+      <div class="tab active">Today</div>
+      <div class="tab">Week</div>
+      <div class="tab">Month</div>
+    </div>
+    <span class="date-label">Wed, Feb 12, 2025</span>
+    <button class="refresh-btn">Refresh Insights</button>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SCORE CARDS: Spider + AI insight + Benchmark  -->
+<!-- ============================================ -->
+<div class="scores-row">
+
+  <!-- ========== SLEEP: 85 ========== -->
+  <div class="score-card sleep">
+    <div class="score-top">
+      <div>
+        <div class="score-category">Sleep</div>
+        <div class="score-number-row">
+          <div class="score-big" style="color:var(--blue)">85</div>
+          <span class="score-delta delta-pos">+3 vs avg</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="score-insight">
+      <strong>Deep sleep was your best in 2 weeks</strong> thanks to yesterday's workout. REM took a hit from late-evening cortisol — that's the one area dragging your score.
+    </div>
+
+    <!-- Spider chart: 7 axes -->
+    <div class="spider-wrap">
+      <svg class="spider-svg" viewBox="0 0 220 210">
+        <!-- Grid rings (heptagon at 25%, 50%, 75%, 100%) -->
+        <polygon class="spider-grid" points="110,85 125.6,92.5 129.5,109.5 118.7,123 101.3,123 90.5,109.5 94.4,92.5"/>
+        <polygon class="spider-grid" points="110,65 141.3,80 149,113.9 127.4,141 92.6,141 71,113.9 78.7,80"/>
+        <polygon class="spider-grid" points="110,45 156.9,67.6 168.5,118.4 136,159.1 84,159.1 51.5,118.4 63.1,67.6"/>
+        <polygon class="spider-grid" points="110,25 172.5,55.1 188,122.8 144.7,177.1 75.3,177.1 32,122.8 47.5,55.1"/>
+        <!-- Axis lines -->
+        <line class="spider-axis" x1="110" y1="105" x2="110" y2="25"/>
+        <line class="spider-axis" x1="110" y1="105" x2="172.5" y2="55.1"/>
+        <line class="spider-axis" x1="110" y1="105" x2="188" y2="122.8"/>
+        <line class="spider-axis" x1="110" y1="105" x2="144.7" y2="177.1"/>
+        <line class="spider-axis" x1="110" y1="105" x2="75.3" y2="177.1"/>
+        <line class="spider-axis" x1="110" y1="105" x2="32" y2="122.8"/>
+        <line class="spider-axis" x1="110" y1="105" x2="47.5" y2="55.1"/>
+        <!-- Baseline polygon (dashed, ~82-85 avg) -->
+        <polygon class="spider-baseline" points="110,35 165.7,60.6 174,119.6 139.5,166.3 81.2,164.8 44.5,120 60,65.1"/>
+        <!-- Today polygon -->
+        <polygon class="spider-today" points="110,29 167.5,59.1 180.2,121 140.5,168.4 80.5,166.3 47.6,119.2 65,69.1"
+          fill="rgba(59,130,246,0.12)" stroke="var(--blue)"/>
+        <!-- Today dots -->
+        <circle class="spider-dot" cx="110" cy="29" r="3" fill="var(--green)"/><!-- Latency 95 -->
+        <circle class="spider-dot" cx="167.5" cy="59.1" r="3" fill="var(--green)"/><!-- Efficiency 92 -->
+        <circle class="spider-dot" cx="180.2" cy="121" r="3" fill="var(--green)"/><!-- Deep 90 -->
+        <circle class="spider-dot" cx="140.5" cy="168.4" r="3" fill="var(--blue)"/><!-- Total 88 -->
+        <circle class="spider-dot" cx="80.5" cy="166.3" r="3" fill="var(--blue)"/><!-- Restful 85 -->
+        <circle class="spider-dot" cx="47.6" cy="119.2" r="3" fill="var(--blue)"/><!-- Timing 80 -->
+        <circle class="spider-dot" cx="65" cy="69.1" r="3" fill="var(--orange)"/><!-- REM 72 ← drag -->
+        <!-- Labels -->
+        <text class="spider-label spider-label-boost" x="110" y="16" text-anchor="middle">Latency 95</text>
+        <text class="spider-label spider-label-boost" x="182" y="52" text-anchor="start">Efficiency 92</text>
+        <text class="spider-label spider-label-boost" x="194" y="126" text-anchor="start">Deep 90</text>
+        <text class="spider-label" x="148" y="190" text-anchor="middle">Total 88</text>
+        <text class="spider-label" x="72" y="190" text-anchor="middle">Restful 85</text>
+        <text class="spider-label" x="26" y="126" text-anchor="end">Timing 80</text>
+        <text class="spider-label spider-label-drag" x="38" y="64" text-anchor="end">REM 72 !</text>
+      </svg>
+    </div>
+    <div class="spider-legend">
+      <span><span class="legend-swatch" style="background:var(--blue)"></span> Today</span>
+      <span><span class="legend-swatch-dash"></span> Your 30d baseline</span>
+    </div>
+
+    <div class="good-ref">
+      <strong>Good looks like:</strong> All contributors &ge;80, total sleep &ge;7.5h, efficiency &ge;90%, deep &ge;1h, REM &ge;1.5h
+    </div>
+  </div>
+
+  <!-- ========== READINESS: 90 ========== -->
+  <div class="score-card readiness">
+    <div class="score-top">
+      <div>
+        <div class="score-category">Readiness</div>
+        <div class="score-number-row">
+          <div class="score-big" style="color:var(--green)">90</div>
+          <span class="score-delta delta-pos">+5 vs avg</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="score-insight">
+      <strong>Fully recovered.</strong> HRV rebounded to 52ms and resting HR dropped to 54 bpm — your best autonomic balance in 10 days. Green light for intensity.
+    </div>
+
+    <!-- Spider chart: 6 axes (hexagon) -->
+    <div class="spider-wrap">
+      <svg class="spider-svg" viewBox="0 0 220 210">
+        <!-- Grid rings (hexagon) -->
+        <polygon class="spider-grid" points="110,85 127.3,95 127.3,115 110,125 92.7,115 92.7,95"/>
+        <polygon class="spider-grid" points="110,65 144.6,85 144.6,125 110,145 75.4,125 75.4,85"/>
+        <polygon class="spider-grid" points="110,45 161.9,75 161.9,135 110,165 58.1,135 58.1,75"/>
+        <polygon class="spider-grid" points="110,25 179.3,65 179.3,145 110,185 40.7,145 40.7,65"/>
+        <!-- Axis lines -->
+        <line class="spider-axis" x1="110" y1="105" x2="110" y2="25"/>
+        <line class="spider-axis" x1="110" y1="105" x2="179.3" y2="65"/>
+        <line class="spider-axis" x1="110" y1="105" x2="179.3" y2="145"/>
+        <line class="spider-axis" x1="110" y1="105" x2="110" y2="185"/>
+        <line class="spider-axis" x1="110" y1="105" x2="40.7" y2="145"/>
+        <line class="spider-axis" x1="110" y1="105" x2="40.7" y2="65"/>
+        <!-- Baseline (~85 all around) -->
+        <polygon class="spider-baseline" points="110,37 168.9,71 168.9,139 110,173 51.1,139 51.1,71"/>
+        <!-- Today: HRV=93, Recovery=91, RHR=90, Temp=87, PrevNight=85, SleepBal=82 -->
+        <polygon class="spider-today" points="110,30.6 173.1,68.6 172.4,141 110,174.6 51.1,139 53.2,72.2"
+          fill="rgba(34,197,94,0.12)" stroke="var(--green)"/>
+        <!-- Today dots -->
+        <circle class="spider-dot" cx="110" cy="30.6" r="3" fill="var(--green)"/>
+        <circle class="spider-dot" cx="173.1" cy="68.6" r="3" fill="var(--green)"/>
+        <circle class="spider-dot" cx="172.4" cy="141" r="3" fill="var(--green)"/>
+        <circle class="spider-dot" cx="110" cy="174.6" r="3" fill="var(--blue)"/>
+        <circle class="spider-dot" cx="51.1" cy="139" r="3" fill="var(--blue)"/>
+        <circle class="spider-dot" cx="53.2" cy="72.2" r="3" fill="var(--blue)"/>
+        <!-- Labels -->
+        <text class="spider-label spider-label-boost" x="110" y="18" text-anchor="middle">HRV Bal. 93</text>
+        <text class="spider-label spider-label-boost" x="186" y="64" text-anchor="start">Recovery 91</text>
+        <text class="spider-label spider-label-boost" x="186" y="148" text-anchor="start">Resting HR 90</text>
+        <text class="spider-label" x="110" y="198" text-anchor="middle">Body Temp 87</text>
+        <text class="spider-label" x="32" y="148" text-anchor="end">Prev Night 85</text>
+        <text class="spider-label" x="32" y="68" text-anchor="end">Sleep Bal. 82</text>
+      </svg>
+    </div>
+    <div class="spider-legend">
+      <span><span class="legend-swatch" style="background:var(--green)"></span> Today</span>
+      <span><span class="legend-swatch-dash"></span> Your 30d baseline</span>
+    </div>
+
+    <div class="good-ref">
+      <strong>Good looks like:</strong> Score &ge;85, HRV above your 30d avg, RHR below avg, temp deviation &lt;0.3°C, all contributors &ge;80
+    </div>
+  </div>
+
+  <!-- ========== ACTIVITY: 70 ========== -->
+  <div class="score-card activity">
+    <div class="score-top">
+      <div>
+        <div class="score-category">Activity</div>
+        <div class="score-number-row">
+          <div class="score-big" style="color:var(--orange)">70</div>
+          <span class="score-delta delta-neg">-8 vs avg</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="score-insight">
+      <strong>5-day step decline.</strong> Daily steps and hourly movement are dragging the score. Body is fully recovered — good day to break the trend.
+    </div>
+
+    <!-- Spider chart: 5 axes (pentagon) -->
+    <div class="spider-wrap">
+      <svg class="spider-svg" viewBox="0 0 220 210">
+        <!-- Grid rings (pentagon) -->
+        <polygon class="spider-grid" points="110,85 129,90.1 121.8,111.2 98.2,111.2 91,90.1"/>
+        <polygon class="spider-grid" points="110,65 148,75.2 133.5,117.4 86.5,117.4 72,75.2"/>
+        <polygon class="spider-grid" points="110,45 167,60.2 145.3,143.5 74.7,143.5 53,60.2"/>
+        <polygon class="spider-grid" points="110,25 186.1,45.3 157,169.7 63,169.7 33.9,45.3"/>
+        <!-- Axis lines -->
+        <line class="spider-axis" x1="110" y1="105" x2="110" y2="25"/>
+        <line class="spider-axis" x1="110" y1="105" x2="186.1" y2="45.3"/>
+        <line class="spider-axis" x1="110" y1="105" x2="157" y2="169.7"/>
+        <line class="spider-axis" x1="110" y1="105" x2="63" y2="169.7"/>
+        <line class="spider-axis" x1="110" y1="105" x2="33.9" y2="45.3"/>
+        <!-- Baseline (~78 avg) -->
+        <polygon class="spider-baseline" points="110,42.6 169.3,51.7 146.7,155.5 73.3,155.5 50.7,51.7"/>
+        <!-- Today: Freq=82, Vol=74, MoveHr=60, Steps=55, Targets=52 -->
+        <polygon class="spider-today" points="110,39.4 166.3,52.7 138.2,143.8 84.1,140.6 70.4,57.1"
+          fill="rgba(249,115,22,0.12)" stroke="var(--orange)"/>
+        <!-- Today dots -->
+        <circle class="spider-dot" cx="110" cy="39.4" r="3" fill="var(--blue)"/>
+        <circle class="spider-dot" cx="166.3" cy="52.7" r="3" fill="var(--blue)"/>
+        <circle class="spider-dot" cx="138.2" cy="143.8" r="3" fill="var(--red)"/>
+        <circle class="spider-dot" cx="84.1" cy="140.6" r="3" fill="var(--red)"/>
+        <circle class="spider-dot" cx="70.4" cy="57.1" r="3" fill="var(--red)"/>
+        <!-- Labels -->
+        <text class="spider-label" x="110" y="16" text-anchor="middle">Train Freq 82</text>
+        <text class="spider-label" x="196" y="46" text-anchor="start">Train Vol 74</text>
+        <text class="spider-label spider-label-drag" x="162" y="182" text-anchor="start">Move/Hr 60 !</text>
+        <text class="spider-label spider-label-drag" x="56" y="182" text-anchor="end">Steps 55 !</text>
+        <text class="spider-label spider-label-drag" x="24" y="52" text-anchor="end">Targets 52 !</text>
+      </svg>
+    </div>
+    <div class="spider-legend">
+      <span><span class="legend-swatch" style="background:var(--orange)"></span> Today</span>
+      <span><span class="legend-swatch-dash"></span> Your 30d baseline</span>
+    </div>
+
+    <div class="good-ref">
+      <strong>Good looks like:</strong> Score &ge;75, &ge;8,000 steps, moving every hour, &ge;500 active cal, meeting daily targets
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- AI BRIEFING                                   -->
+<!-- ============================================ -->
+<div class="ai-briefing">
+  <div class="ai-header">
+    <span class="ai-badge">AI BRIEFING</span>
+    <span class="ai-timestamp">Generated at 6:32 AM &middot; Morning analysis</span>
+  </div>
+  <div class="ai-body">
+    <div class="ai-reasoning">
+      <h4>Why your body looks this way</h4>
+      <div class="chain-step">
+        <p><strong>Observation:</strong> Deep sleep hit 1h 18m (top 15% of last 90 days), while REM dropped to 1h 34m (below your 1h 42m norm).</p>
+      </div>
+      <div class="chain-arrow">&darr;</div>
+      <div class="chain-step">
+        <p><strong>Cause:</strong> Your 7:30 PM strength session increased adenosine pressure (more deep sleep), but residual cortisol suppressed REM in the second half of the night.</p>
+      </div>
+      <div class="chain-arrow">&darr;</div>
+      <div class="chain-step">
+        <p><strong>So what:</strong> Physical recovery was excellent. Cognitive/emotional recovery via REM was slightly short. Net: you're fully recovered (HRV +4ms proves it) and ready for intensity.</p>
+      </div>
+    </div>
+    <div class="ai-actions">
+      <h4>What to do today</h4>
+      <div class="action-item a-high">
+        <div class="action-num" style="background:rgba(34,197,94,0.12);color:var(--green)">1</div>
+        <div class="action-content">
+          <div class="action-title" style="color:var(--green)">Go hard if you have a workout planned</div>
+          <div class="action-detail">Readiness 90 + HRV rebound = full capacity. HIIT, heavy lifts, tempo runs all on the table.</div>
+          <span class="action-tag" style="background:rgba(34,197,94,0.1);color:var(--green)">High priority</span>
+        </div>
+      </div>
+      <div class="action-item a-med">
+        <div class="action-num" style="background:rgba(59,130,246,0.12);color:var(--blue)">2</div>
+        <div class="action-content">
+          <div class="action-title" style="color:var(--blue)">Finish exercise by 6 PM tonight</div>
+          <div class="action-detail">Moving 90 min earlier gives cortisol time to clear, which should restore REM.</div>
+          <span class="action-tag" style="background:rgba(59,130,246,0.1);color:var(--blue)">Fix REM</span>
+        </div>
+      </div>
+      <div class="action-item a-med">
+        <div class="action-num" style="background:rgba(249,115,22,0.12);color:var(--orange)">3</div>
+        <div class="action-content">
+          <div class="action-title" style="color:var(--orange)">Take a 20-min walk after lunch</div>
+          <div class="action-detail">5-day step decline (6,800 vs 8,200 norm). A short walk breaks the pattern.</div>
+          <span class="action-tag" style="background:rgba(249,115,22,0.1);color:var(--orange)">Break trend</span>
+        </div>
+      </div>
+      <div class="action-item a-low">
+        <div class="action-num">4</div>
+        <div class="action-content">
+          <div class="action-title">Box breathing before bed (10 PM)</div>
+          <div class="action-detail">4-4-4-4 for 5 min to help REM. Optional — sleep is already good.</div>
+          <span class="action-tag" style="background:rgba(255,255,255,0.04);color:var(--text-muted)">Optional</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- MIDDLE: HYPNOGRAM + VITALS                    -->
+<!-- ============================================ -->
+<div class="mid-grid">
+  <div class="card">
+    <div class="card-title">Sleep Stages — Last Night</div>
+    <div class="hypnogram">
+      <div class="hypno-row">
+        <span class="hypno-label">Awake</span>
+        <div class="hypno-bar-track">
+          <div class="hypno-seg" style="width:3%;background:var(--red);opacity:0.7"></div>
+          <div class="hypno-seg" style="width:12%;background:transparent"></div>
+          <div class="hypno-seg" style="width:2%;background:var(--red);opacity:0.7"></div>
+          <div class="hypno-seg" style="width:20%;background:transparent"></div>
+          <div class="hypno-seg" style="width:1%;background:var(--red);opacity:0.7"></div>
+          <div class="hypno-seg" style="width:30%;background:transparent"></div>
+          <div class="hypno-seg" style="width:2%;background:var(--red);opacity:0.7"></div>
+          <div class="hypno-seg" style="width:30%;background:transparent"></div>
+        </div>
+      </div>
+      <div class="hypno-row">
+        <span class="hypno-label">REM</span>
+        <div class="hypno-bar-track">
+          <div class="hypno-seg" style="width:5%;background:transparent"></div>
+          <div class="hypno-seg" style="width:8%;background:var(--purple);opacity:0.7"></div>
+          <div class="hypno-seg" style="width:10%;background:transparent"></div>
+          <div class="hypno-seg" style="width:12%;background:var(--purple);opacity:0.7"></div>
+          <div class="hypno-seg" style="width:8%;background:transparent"></div>
+          <div class="hypno-seg" style="width:18%;background:var(--purple);opacity:0.7"></div>
+          <div class="hypno-seg" style="width:6%;background:transparent"></div>
+          <div class="hypno-seg" style="width:20%;background:var(--purple);opacity:0.7"></div>
+          <div class="hypno-seg" style="width:13%;background:transparent"></div>
+        </div>
+      </div>
+      <div class="hypno-row">
+        <span class="hypno-label">Light</span>
+        <div class="hypno-bar-track">
+          <div class="hypno-seg" style="width:10%;background:var(--blue);opacity:0.5"></div>
+          <div class="hypno-seg" style="width:5%;background:transparent"></div>
+          <div class="hypno-seg" style="width:15%;background:var(--blue);opacity:0.5"></div>
+          <div class="hypno-seg" style="width:4%;background:transparent"></div>
+          <div class="hypno-seg" style="width:10%;background:var(--blue);opacity:0.5"></div>
+          <div class="hypno-seg" style="width:8%;background:transparent"></div>
+          <div class="hypno-seg" style="width:12%;background:var(--blue);opacity:0.5"></div>
+          <div class="hypno-seg" style="width:6%;background:transparent"></div>
+          <div class="hypno-seg" style="width:14%;background:var(--blue);opacity:0.5"></div>
+          <div class="hypno-seg" style="width:16%;background:transparent"></div>
+        </div>
+      </div>
+      <div class="hypno-row">
+        <span class="hypno-label">Deep</span>
+        <div class="hypno-bar-track">
+          <div class="hypno-seg" style="width:3%;background:transparent"></div>
+          <div class="hypno-seg" style="width:18%;background:var(--cyan);opacity:0.8"></div>
+          <div class="hypno-seg" style="width:8%;background:transparent"></div>
+          <div class="hypno-seg" style="width:14%;background:var(--cyan);opacity:0.8"></div>
+          <div class="hypno-seg" style="width:15%;background:transparent"></div>
+          <div class="hypno-seg" style="width:6%;background:var(--cyan);opacity:0.8"></div>
+          <div class="hypno-seg" style="width:36%;background:transparent"></div>
+        </div>
+      </div>
+    </div>
+    <div class="hypno-time-axis">
+      <span>10:45 PM</span><span>12:00 AM</span><span>2:00 AM</span><span>4:00 AM</span><span>6:27 AM</span>
+    </div>
+    <div class="hypno-legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span> Deep 1h 18m</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--blue);opacity:0.5"></span> Light 3h 26m</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span> REM 1h 34m</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--red);opacity:0.6"></span> Awake 24m</span>
+    </div>
+    <div class="chart-callout">
+      <p><strong>Reading this chart:</strong> Deep sleep (cyan) concentrated in first 3 hours = adenosine effect from workout. REM (purple) blocks in the second half are shorter than your typical night — cortisol from the 7:30 PM session is the likely cause. Exercising before 6 PM should fix this pattern.</p>
+    </div>
+  </div>
+
+  <div class="card" style="padding:20px">
+    <div class="card-title">Key Vitals</div>
+    <div class="vitals-stack">
+      <div class="vital-card">
+        <div class="vital-top">
+          <div>
+            <div class="vital-label">HRV</div>
+            <div class="vital-value" style="color:var(--cyan)">52<span class="vital-unit">ms</span></div>
+          </div>
+          <div class="vital-delta" style="color:var(--green)">+4 vs avg</div>
+        </div>
+        <div class="vital-bar">
+          <div class="vital-bar-fill" style="width:100%;background:rgba(6,182,212,0.15);border-radius:2px"></div>
+          <div class="vital-bar-marker" style="left:60%;background:var(--text-muted);opacity:0.4"></div>
+          <div class="vital-bar-marker" style="left:75%;background:var(--cyan)"></div>
+        </div>
+        <div class="vital-context"><strong>Best in 10 days.</strong> Strong parasympathetic rebound confirms full recovery.</div>
+      </div>
+      <div class="vital-card">
+        <div class="vital-top">
+          <div>
+            <div class="vital-label">Resting Heart Rate</div>
+            <div class="vital-value" style="color:var(--blue)">54<span class="vital-unit">bpm</span></div>
+          </div>
+          <div class="vital-delta" style="color:var(--green)">-2 vs avg</div>
+        </div>
+        <div class="vital-bar">
+          <div class="vital-bar-fill" style="width:100%;background:rgba(59,130,246,0.15);border-radius:2px"></div>
+          <div class="vital-bar-marker" style="left:55%;background:var(--text-muted);opacity:0.4"></div>
+          <div class="vital-bar-marker" style="left:40%;background:var(--blue)"></div>
+        </div>
+        <div class="vital-context">Lower is better. RHR + HRV both improving = <strong>strong recovery signal.</strong></div>
+      </div>
+      <div class="vital-card">
+        <div class="vital-top">
+          <div>
+            <div class="vital-label">Body Temp</div>
+            <div class="vital-value" style="color:var(--text-muted)">+0.1<span class="vital-unit">°C</span></div>
+          </div>
+          <div class="vital-delta" style="color:var(--text-muted)">normal</div>
+        </div>
+        <div class="vital-context" style="border:none;padding-top:4px">Within range. <strong>No illness or inflammation signals.</strong> Spikes &gt;0.5°C would be a warning.</div>
+      </div>
+      <div class="vital-card">
+        <div class="vital-top">
+          <div>
+            <div class="vital-label">Breathing Rate</div>
+            <div class="vital-value" style="color:var(--text-muted)">14.8<span class="vital-unit">br/min</span></div>
+          </div>
+          <div class="vital-delta" style="color:var(--text-muted)">-0.1</div>
+        </div>
+        <div class="vital-context" style="border:none;padding-top:4px">Stable across last 7 nights. <strong>No respiratory stress.</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- TRENDS WITH ANNOTATIONS                       -->
+<!-- ============================================ -->
+<div class="trends-grid">
+  <div class="card">
+    <div class="card-title">Sleep Score — 30 Day Trend</div>
+    <div class="trend-chart">
+      <svg class="trend-svg" viewBox="0 0 600 150" preserveAspectRatio="none">
+        <line x1="0" y1="0" x2="600" y2="0" stroke="#2a2d3a" stroke-width="0.5"/>
+        <line x1="0" y1="37" x2="600" y2="37" stroke="#2a2d3a" stroke-width="0.5"/>
+        <line x1="0" y1="75" x2="600" y2="75" stroke="#2a2d3a" stroke-width="0.5"/>
+        <line x1="0" y1="112" x2="600" y2="112" stroke="#2a2d3a" stroke-width="0.5"/>
+        <line x1="0" y1="150" x2="600" y2="150" stroke="#2a2d3a" stroke-width="0.5"/>
+        <rect x="0" y="28" width="600" height="28" fill="rgba(59,130,246,0.06)" rx="2"/>
+        <line x1="0" y1="42" x2="600" y2="42" stroke="var(--blue)" stroke-width="1" stroke-dasharray="6,4" opacity="0.3"/>
+        <polyline fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"
+          points="0,56 20,48 40,64 60,52 80,40 100,36 120,48 140,52 160,60 180,44 200,40 220,48 240,56 260,44 280,36 300,32 320,40 340,48 360,36 380,44 400,52 420,40 440,36 460,28 480,32 500,40 520,36 540,24 560,28 580,20 600,24"/>
+        <defs>
+          <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.4"/>
+            <stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <polygon fill="url(#blueGrad)" opacity="0.15"
+          points="0,56 20,48 40,64 60,52 80,40 100,36 120,48 140,52 160,60 180,44 200,40 220,48 240,56 260,44 280,36 300,32 320,40 340,48 360,36 380,44 400,52 420,40 440,36 460,28 480,32 500,40 520,36 540,24 560,28 580,20 600,24 600,150 0,150"/>
+        <circle cx="600" cy="24" r="5" fill="var(--blue)" stroke="var(--bg)" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="trend-axis-labels">
+      <span>Jan 14</span><span>Jan 21</span><span>Jan 28</span><span>Feb 4</span><span>Feb 12</span>
+    </div>
+    <div class="trend-legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span> Sleep Score</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--blue);opacity:0.2"></span> 30d Avg ±1σ</span>
+    </div>
+    <div class="trend-annotation ann-green">
+      <span class="ann-icon">&#9650;</span>
+      <span class="ann-text"><strong>Upward trend for 10 days.</strong> Consistently above your 30d average since Feb 3. Keep your bedtime routine — it's working.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">HRV & Resting HR — 30 Day Trend</div>
+    <div class="trend-chart">
+      <svg class="trend-svg" viewBox="0 0 600 150" preserveAspectRatio="none">
+        <line x1="0" y1="0" x2="600" y2="0" stroke="#2a2d3a" stroke-width="0.5"/>
+        <line x1="0" y1="37" x2="600" y2="37" stroke="#2a2d3a" stroke-width="0.5"/>
+        <line x1="0" y1="75" x2="600" y2="75" stroke="#2a2d3a" stroke-width="0.5"/>
+        <line x1="0" y1="112" x2="600" y2="112" stroke="#2a2d3a" stroke-width="0.5"/>
+        <line x1="0" y1="150" x2="600" y2="150" stroke="#2a2d3a" stroke-width="0.5"/>
+        <polyline fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linejoin="round"
+          points="0,100 20,88 40,96 60,80 80,72 100,84 120,76 140,80 160,92 180,72 200,68 220,76 240,84 260,72 280,64 300,60 320,68 340,72 360,64 380,60 400,68 420,56 440,52 460,60 480,56 500,64 520,52 540,48 560,44 580,48 600,40"/>
+        <polygon fill="url(#cyanGrad)" opacity="0.12"
+          points="0,100 20,88 40,96 60,80 80,72 100,84 120,76 140,80 160,92 180,72 200,68 220,76 240,84 260,72 280,64 300,60 320,68 340,72 360,64 380,60 400,68 420,56 440,52 460,60 480,56 500,64 520,52 540,48 560,44 580,48 600,40 600,150 0,150"/>
+        <circle cx="600" cy="40" r="4" fill="var(--cyan)" stroke="var(--bg)" stroke-width="2"/>
+        <polyline fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6,3"
+          points="0,48 20,52 40,44 60,56 80,60 100,52 120,56 140,52 160,44 180,56 200,60 220,56 240,52 260,56 280,60 300,64 320,60 340,56 360,64 380,60 400,56 420,64 440,68 460,60 480,64 500,60 520,68 540,72 560,68 580,72 600,76"/>
+        <circle cx="600" cy="76" r="4" fill="var(--orange)" stroke="var(--bg)" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="trend-axis-labels">
+      <span>Jan 14</span><span>Jan 21</span><span>Jan 28</span><span>Feb 4</span><span>Feb 12</span>
+    </div>
+    <div class="trend-legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span> HRV (ms)</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--orange)"></span> Resting HR (bpm)</span>
+    </div>
+    <div class="trend-annotation ann-green">
+      <span class="ann-icon">&#9829;</span>
+      <span class="ann-text"><strong>HRV up, RHR down — the ideal combo.</strong> Both moving in the recovery direction for 2 weeks. Fitness improving or stress decreasing.</span>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  ByeSamosa &middot; Last sync: 6:30 AM &middot; Data from Oura Ring 4 &middot; AI powered by Claude
+</div>
+
+</body>
+</html>

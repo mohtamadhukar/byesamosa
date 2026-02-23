@@ -1,0 +1,92 @@
+# Data Analysis Request for 2026-02-14
+
+Analyze the following Oura Ring data and generate personalized insights.
+
+## Latest Day Scores
+Date: 2026-02-14
+
+**Sleep Score:** 85
+**Readiness Score:** 94
+**Activity Score:** 89
+
+## Sleep Metrics
+- Total Sleep: 7.2h
+- REM Sleep: 1.7h (24%)
+- Deep Sleep: 1.2h (16%)
+- Light Sleep: 3.9h (54%)
+- Efficiency: 92%
+- HRV: 65.4ms
+- Resting Heart Rate: 49bpm
+- Temperature Deviation: -0.23°C
+
+## Activity Metrics
+- Steps: 13,042
+- Active Calories: 352
+
+## Your Baseline Statistics
+
+For context, here are your rolling averages:
+
+**Sleep Score:** 7d avg: 85.1, 30d avg: 83.9, 90d avg: 83.9
+  (30d std dev: 5.4)
+**Readiness Score:** 7d avg: 87.0, 30d avg: 83.9, 90d avg: 83.9
+  (30d std dev: 6.0)
+**Activity Score:** 7d avg: 84.9, 30d avg: 79.8, 90d avg: 79.8
+  (30d std dev: 6.2)
+**HRV:** 7d avg: 55.1, 30d avg: 55.0, 90d avg: 55.0
+  (30d std dev: 15.6)
+**Resting Heart Rate:** 7d avg: 57.1, 30d avg: 56.3, 90d avg: 56.3
+  (30d std dev: 6.4)
+**Total Sleep:** 7d avg: 7.9h, 30d avg: 7.6h, 90d avg: 7.6h
+  (30d std dev: 2906.6)
+**Deep Sleep:** 7d avg: 1.3h, 30d avg: 1.3h, 90d avg: 1.3h
+  (30d std dev: 597.2)
+**REM Sleep:** 7d avg: 1.8h, 30d avg: 1.8h, 90d avg: 1.8h
+  (30d std dev: 709.3)
+**Sleep Efficiency:** 7d avg: 90%, 30d avg: 90%, 90d avg: 90%
+  (30d std dev: 0.0)
+
+## Recent Trends (Last 7 Days)
+
+**Sleep Score:** 91, 92, 77, 83, 83, 85, 85
+**Readiness Score:** 87, 93, 79, 89, 78, 89, 94
+**Activity Score:** 87, 92, 82, 82, 88, 74, 89
+
+## Required Output Format
+
+Generate a complete AIInsight JSON object with:
+
+1. **score_insights**: For each score type (sleep, readiness, activity):
+   - one_liner: Brief summary of what drove the score
+   - contributors: Array of ContributorLabel objects (name, value 0-100, tag)
+     - Tag as 'boost' (>=85), 'ok' (75-84), or 'drag' (<75) based on estimated contributor values
+     - For sleep: include contributors like 'Total Sleep', 'REM Sleep', 'Deep Sleep', 'Efficiency', 'Latency', 'Restfulness'
+     - For readiness: include 'HRV Balance', 'RHR', 'Sleep Balance', 'Temperature', 'Recovery Index'
+     - For activity: include 'Steps', 'Active Calories', 'Activity Balance'
+
+2. **reasoning_chain**: Exactly 3 steps:
+   - Step 1 label='Observation': What stands out in the data?
+   - Step 2 label='Cause': What's the physiological explanation?
+   - Step 3 label='So what': What does this mean for the user?
+
+3. **actions**: 3-4 specific action items:
+   - Priority: 'high' for critical items, 'medium' for beneficial, 'low' for optional
+   - Tag: Category like 'Fix REM', 'Prevent injury', 'Optimize performance'
+
+4. **vital_annotations**: Context for each vital:
+   - Keys: 'hrv', 'rhr', 'temp', 'breath' (even if breath data not available, provide annotation)
+   - Each value: ChartAnnotation with 'text' field
+
+5. **trend_annotations**: Insights for trend charts:
+   - Keys: 'sleep_score', 'hrv_rhr'
+   - Each value: TrendAnnotation with 'icon' (up/down/heart) and 'text'
+
+6. **good_looks_like**: Personalized benchmarks based on user's data:
+   - Keys: 'sleep', 'readiness', 'activity'
+   - Each value: Description of what a good day looks like for THIS user
+   - Example: 'All contributors >=80, total sleep >=7.5h, efficiency >=90%'
+
+7. **hypnogram_annotation**: Optional ChartAnnotation for sleep stage visualization
+   - Provide insight about sleep architecture (REM cycles, deep sleep timing, etc.)
+
+Return ONLY valid JSON. No markdown formatting, no code blocks.

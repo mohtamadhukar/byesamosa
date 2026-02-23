@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ByeSamosa — Scores V4: Morning Briefing</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --card-border: #2a2d3a;
+    --text: #e4e4e7;
+    --text-muted: #71717a;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --orange: #f97316;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+    --yellow: #eab308;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    padding: 32px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .mockup-banner {
+    text-align: center; padding: 10px; margin-bottom: 24px;
+    background: rgba(249,115,22,0.08); border: 1px dashed rgba(249,115,22,0.3);
+    border-radius: 10px; font-size: 12px; color: var(--orange); letter-spacing: 0.5px;
+  }
+  .version-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--purple); margin-bottom: 8px; }
+  .version-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .version-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; max-width: 700px; }
+
+  /* Briefing container */
+  .briefing {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  /* Top gradient header */
+  .brief-header {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(34,197,94,0.1), rgba(168,85,247,0.08));
+    padding: 32px 40px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .brief-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .brief-greeting {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .brief-oneliner {
+    font-size: 15px;
+    color: #a1a1aa;
+    line-height: 1.5;
+  }
+  .brief-oneliner strong { color: var(--text); font-weight: 500; }
+
+  /* Score strip in header */
+  .score-strip {
+    display: flex;
+    gap: 24px;
+    margin-top: 20px;
+  }
+  .ss-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ss-ring {
+    position: relative;
+    width: 44px;
+    height: 44px;
+  }
+  .ss-ring svg { width: 44px; height: 44px; }
+  .ss-ring-bg { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 4; }
+  .ss-ring-fill { fill: none; stroke-width: 4; stroke-linecap: round; }
+  .ss-num {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .ss-text {}
+  .ss-label { font-size: 11px; color: var(--text-muted); }
+  .ss-delta { font-size: 12px; font-weight: 600; }
+
+  /* Main body sections */
+  .brief-body {
+    padding: 0;
+  }
+
+  /* Section: what happened */
+  .brief-section {
+    padding: 28px 40px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .brief-section:last-child { border-bottom: none; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .section-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* Insight paragraphs */
+  .insight-para {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #a1a1aa;
+    margin-bottom: 12px;
+  }
+  .insight-para:last-child { margin-bottom: 0; }
+  .insight-para strong { color: var(--text); font-weight: 500; }
+  .inline-metric {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.05);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .inline-delta {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .id-green { background: rgba(34,197,94,0.12); color: var(--green); }
+  .id-red { background: rgba(239,68,68,0.12); color: var(--red); }
+  .id-orange { background: rgba(249,115,22,0.12); color: var(--orange); }
+  .id-neutral { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+
+  /* Three-column quick stats inside a section */
+  .quick-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .qs-item {
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .qs-value {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .qs-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .qs-bar {
+    height: 3px;
+    border-radius: 2px;
+    margin-top: 8px;
+    background: #2a2d3a;
+    position: relative;
+    overflow: hidden;
+  }
+  .qs-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  /* Action items */
+  .actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .action-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: rgba(255,255,255,0.02);
+    padding: 14px 18px;
+    border-radius: 12px;
+    border-left: 3px solid transparent;
+  }
+  .action-item.priority-high { border-left-color: var(--green); }
+  .action-item.priority-med { border-left-color: var(--blue); }
+  .action-item.priority-low { border-left-color: var(--text-muted); }
+  .action-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .action-content {}
+  .action-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .action-detail {
+    font-size: 12px;
+    color: #71717a;
+    line-height: 1.5;
+  }
+  .action-tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-top: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="mockup-banner">MOCKUP — Score Section Variant</div>
+
+<div class="version-label">Version 4</div>
+<div class="version-title">Morning Briefing — Editorial / Newsletter Style</div>
+<div class="version-desc">
+  Treats the dashboard like a personalized daily newsletter. Scores, metrics, and AI reasoning are woven into readable prose sections — not isolated widgets. Numbers appear inline where they're relevant. Designed to be read top-to-bottom in 30 seconds.
+</div>
+
+<div class="briefing">
+
+  <!-- Header -->
+  <div class="brief-header">
+    <div class="brief-date">Wednesday, February 12, 2025 &middot; Morning Report</div>
+    <div class="brief-greeting">Good morning, Mohtam.</div>
+    <div class="brief-oneliner">
+      Last night's workout paid off — your <strong>deep sleep hit a 2-week high</strong>, and you're fully recovered. But REM was compressed, and your step count is in a 5-day slump.
+    </div>
+    <div class="score-strip">
+      <div class="ss-item">
+        <div class="ss-ring">
+          <svg viewBox="0 0 44 44">
+            <circle class="ss-ring-bg" cx="22" cy="22" r="18"/>
+            <circle class="ss-ring-fill" cx="22" cy="22" r="18"
+              stroke="#3b82f6" stroke-dasharray="113.1" stroke-dashoffset="17"
+              transform="rotate(-90 22 22)"/>
+          </svg>
+          <span class="ss-num" style="color:var(--blue)">85</span>
+        </div>
+        <div class="ss-text">
+          <div class="ss-label">Sleep</div>
+          <div class="ss-delta" style="color:var(--green)">+3 vs avg</div>
+        </div>
+      </div>
+      <div class="ss-item">
+        <div class="ss-ring">
+          <svg viewBox="0 0 44 44">
+            <circle class="ss-ring-bg" cx="22" cy="22" r="18"/>
+            <circle class="ss-ring-fill" cx="22" cy="22" r="18"
+              stroke="#22c55e" stroke-dasharray="113.1" stroke-dashoffset="11.3"
+              transform="rotate(-90 22 22)"/>
+          </svg>
+          <span class="ss-num" style="color:var(--green)">90</span>
+        </div>
+        <div class="ss-text">
+          <div class="ss-label">Readiness</div>
+          <div class="ss-delta" style="color:var(--green)">+5 vs avg</div>
+        </div>
+      </div>
+      <div class="ss-item">
+        <div class="ss-ring">
+          <svg viewBox="0 0 44 44">
+            <circle class="ss-ring-bg" cx="22" cy="22" r="18"/>
+            <circle class="ss-ring-fill" cx="22" cy="22" r="18"
+              stroke="#f97316" stroke-dasharray="113.1" stroke-dashoffset="33.9"
+              transform="rotate(-90 22 22)"/>
+          </svg>
+          <span class="ss-num" style="color:var(--orange)">70</span>
+        </div>
+        <div class="ss-text">
+          <div class="ss-label">Activity</div>
+          <div class="ss-delta" style="color:var(--red)">-8 vs avg</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="brief-body">
+
+    <!-- Section: Last Night's Sleep -->
+    <div class="brief-section">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(59,130,246,0.12);color:var(--blue)">&#9790;</div>
+        <div class="section-title">What happened last night</div>
+      </div>
+      <p class="insight-para">
+        You slept <span class="inline-metric">7h 42m</span> with <span class="inline-metric">92%</span> efficiency — both above your baseline. The standout was deep sleep at <span class="inline-metric">1h 18m <span class="inline-delta id-green">+12m</span></span>, your best since Jan 29th. This tracks with the strength workout at 7:30 PM, which increases adenosine pressure and promotes slow-wave sleep in the first 3 hours.
+      </p>
+      <p class="insight-para">
+        The tradeoff: REM came in at <span class="inline-metric">1h 34m <span class="inline-delta id-orange">-8m</span></span>. Late-evening exercise raises cortisol, which suppresses REM in the later sleep cycles. Your sleep latency was excellent (fell asleep in 6 minutes), and restfulness was high.
+      </p>
+
+      <div class="quick-stats">
+        <div class="qs-item">
+          <div class="qs-value" style="color:var(--cyan)">1:18</div>
+          <div class="qs-label">Deep sleep</div>
+          <div class="qs-bar"><div class="qs-bar-fill" style="width:88%;background:var(--cyan)"></div></div>
+        </div>
+        <div class="qs-item">
+          <div class="qs-value" style="color:var(--purple)">1:34</div>
+          <div class="qs-label">REM sleep</div>
+          <div class="qs-bar"><div class="qs-bar-fill" style="width:65%;background:var(--purple)"></div></div>
+        </div>
+        <div class="qs-item">
+          <div class="qs-value" style="color:var(--blue)">3:26</div>
+          <div class="qs-label">Light sleep</div>
+          <div class="qs-bar"><div class="qs-bar-fill" style="width:72%;background:var(--blue)"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: Recovery -->
+    <div class="brief-section">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(34,197,94,0.12);color:var(--green)">&#9829;</div>
+        <div class="section-title">Your body this morning</div>
+      </div>
+      <p class="insight-para">
+        HRV rebounded to <span class="inline-metric">52ms <span class="inline-delta id-green">+4</span></span> — your best in 10 days and a clear sign of parasympathetic recovery. Resting heart rate dropped to <span class="inline-metric">54 bpm <span class="inline-delta id-green">-2</span></span>. Body temperature is at <span class="inline-metric">+0.1°C <span class="inline-delta id-neutral">norm</span></span> — no inflammation signals.
+      </p>
+      <p class="insight-para">
+        <strong>Bottom line:</strong> Your autonomic nervous system is in excellent balance. Readiness of 90 is in the top 20% of your last 90 days. You have full capacity for high-intensity training today.
+      </p>
+    </div>
+
+    <!-- Section: What to do today -->
+    <div class="brief-section">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(168,85,247,0.12);color:var(--purple)">&#10003;</div>
+        <div class="section-title">What to do today</div>
+      </div>
+
+      <div class="actions-list">
+        <div class="action-item priority-high">
+          <div class="action-num" style="background:rgba(34,197,94,0.12);color:var(--green)">1</div>
+          <div class="action-content">
+            <div class="action-title" style="color:var(--green)">Go hard if you have a workout planned</div>
+            <div class="action-detail">Your recovery capacity is at its peak. HIIT, heavy lifts, or tempo runs are all fair game. HRV and RHR both signal strong parasympathetic rebound.</div>
+            <span class="action-tag" style="background:rgba(34,197,94,0.1);color:var(--green)">High priority</span>
+          </div>
+        </div>
+
+        <div class="action-item priority-med">
+          <div class="action-num" style="background:rgba(59,130,246,0.12);color:var(--blue)">2</div>
+          <div class="action-content">
+            <div class="action-title" style="color:var(--blue)">Finish exercise by 6 PM tonight</div>
+            <div class="action-detail">Last night's REM dip is directly linked to the 7:30 PM workout. Shifting 90 minutes earlier gives cortisol time to clear before your sleep window.</div>
+            <span class="action-tag" style="background:rgba(59,130,246,0.1);color:var(--blue)">Sleep optimization</span>
+          </div>
+        </div>
+
+        <div class="action-item priority-med">
+          <div class="action-num" style="background:rgba(249,115,22,0.12);color:var(--orange)">3</div>
+          <div class="action-content">
+            <div class="action-title" style="color:var(--orange)">Add a 20-minute walk after lunch</div>
+            <div class="action-detail">Your steps have been 24% below average for 5 consecutive days (6,800 vs 8,200 norm). A short walk breaks the pattern without taxing recovery.</div>
+            <span class="action-tag" style="background:rgba(249,115,22,0.1);color:var(--orange)">Activity trend</span>
+          </div>
+        </div>
+
+        <div class="action-item priority-low">
+          <div class="action-num">4</div>
+          <div class="action-content">
+            <div class="action-title">Try box breathing before bed (10 PM)</div>
+            <div class="action-detail">4-4-4-4 pattern for 5 minutes lowers sympathetic tone and may help recover REM duration. Optional — your sleep is already good.</div>
+            <span class="action-tag" style="background:rgba(255,255,255,0.04);color:var(--text-muted)">Optional</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,184 @@
+"""CLI orchestrator for ByeSamosa pipeline.
+
+Usage:
+    python -m byesamosa.pipeline import --raw-dir data/raw/2026-02-17 [--refresh]
+    python -m byesamosa.pipeline insights [--date YYYY-MM-DD] [--force]
+    python -m byesamosa.pipeline serve
+"""
+
+import argparse
+import json
+import logging
+import sys
+from datetime import date, datetime
+from pathlib import Path
+
+from byesamosa.config import Settings
+
+logger = logging.getLogger(__name__)
+
+
+def cmd_import(args: argparse.Namespace, settings: Settings) -> None:
+    """Run the import pipeline: CSV -> JSON store -> baselines."""
+    from byesamosa.data.importer import import_oura_export
+
+    raw_dir = Path(args.raw_dir)
+    if not raw_dir.exists():
+        print(f"Error: raw directory not found: {raw_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    summary = import_oura_export(
+        raw_dir=raw_dir,
+        data_dir=settings.data_dir,
+        refresh=args.refresh,
+    )
+
+    print("Import complete:")
+    for dtype, count in summary.items():
+        print(f"  {dtype}: {count}")
+    print(f"  total: {sum(summary.values())}")
+
+
+def cmd_insights(args: argparse.Namespace, settings: Settings) -> None:
+    """Generate AI insight for a given date (default: latest)."""
+    from byesamosa.ai.engine import (
+        cache_insight,
+        generate_insight,
+        load_cached_insight,
+        log_api_cost,
+    )
+    from byesamosa.data.queries import get_latest_day, get_trends, has_sleep_phases
+    from byesamosa.data.store import DataStore
+
+    store = DataStore(settings.data_dir)
+    latest = get_latest_day(store)
+
+    if not latest:
+        print("Error: no data found in store. Run 'import' first.", file=sys.stderr)
+        sys.exit(1)
+
+    # Determine target date
+    if args.date:
+        target_date = date.fromisoformat(args.date)
+    else:
+        target_date = latest["day"]
+
+    # Check cache (skip if --force)
+    if not args.force:
+        cached = load_cached_insight(target_date, settings.data_dir)
+        if cached:
+            print(f"Cached insight already exists for {target_date}. Use --force to regenerate.")
+            return
+
+    # Build context for AI
+    # Load baselines
+    baselines_file = store.processed_dir / "baselines.json"
+    if baselines_file.exists():
+        with open(baselines_file) as f:
+            baselines_raw = json.load(f)
+    else:
+        baselines_raw = []
+
+    from byesamosa.ai.prompts import format_baselines_for_prompt
+
+    baselines = format_baselines_for_prompt(baselines_raw)
+
+    # Get 7-day trends for key metrics
+    trends_7d = {}
+    for metric in ["sleep_score", "readiness_score", "activity_score", "average_hrv", "lowest_heart_rate"]:
+        trends_7d[metric] = get_trends(store, metric, days=7)
+
+    sleep_phases = has_sleep_phases(store)
+
+    print(f"Generating insight for {target_date}...")
+    insight = generate_insight(
+        latest=latest,
+        baselines=baselines,
+        trends_7d=trends_7d,
+        has_sleep_phases=sleep_phases,
+        settings=settings,
+    )
+
+    # Cache and log
+    cache_insight(insight, settings.data_dir)
+    log_api_cost(settings.data_dir, datetime.now(), estimated_cost=0.05)
+
+    print(f"Insight generated and cached for {target_date}.")
+    print(f"  Reasoning steps: {len(insight.reasoning_chain)}")
+    print(f"  Action items: {len(insight.actions)}")
+
+
+def cmd_serve(args: argparse.Namespace, settings: Settings) -> None:
+    """Launch the Streamlit dashboard."""
+    import subprocess
+
+    # Find streamlit_app.py relative to project root
+    app_path = Path(__file__).resolve().parent.parent.parent / "streamlit_app.py"
+    if not app_path.exists():
+        print(f"Error: streamlit_app.py not found at {app_path}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Launching Streamlit dashboard: {app_path}")
+    subprocess.run(
+        [sys.executable, "-m", "streamlit", "run", str(app_path)],
+        check=True,
+    )
+
+
+def main() -> None:
+    """Entry point for the ByeSamosa CLI."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    parser = argparse.ArgumentParser(
+        prog="byesamosa",
+        description="ByeSamosa — Personal Oura Ring data analyzer",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # import subcommand
+    import_parser = subparsers.add_parser(
+        "import", help="Import Oura CSV export into processed store"
+    )
+    import_parser.add_argument(
+        "--raw-dir", required=True, help="Path to directory with exported CSV files"
+    )
+    import_parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Delete existing processed data before importing",
+    )
+
+    # insights subcommand
+    insights_parser = subparsers.add_parser(
+        "insights", help="Generate AI insight for a date"
+    )
+    insights_parser.add_argument(
+        "--date",
+        default=None,
+        help="Target date (YYYY-MM-DD). Default: latest day in store.",
+    )
+    insights_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate even if cached insight exists",
+    )
+
+    # serve subcommand
+    subparsers.add_parser("serve", help="Launch Streamlit dashboard")
+
+    args = parser.parse_args()
+    settings = Settings()
+
+    if args.command == "import":
+        cmd_import(args, settings)
+    elif args.command == "insights":
+        cmd_insights(args, settings)
+    elif args.command == "serve":
+        cmd_serve(args, settings)
+
+
+if __name__ == "__main__":
+    main()

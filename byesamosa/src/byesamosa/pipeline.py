@@ -201,29 +201,79 @@ def cmd_pull(args: argparse.Namespace, settings: Settings) -> None:
 
 
 def cmd_serve(args: argparse.Namespace, settings: Settings) -> None:
-    """Launch the Streamlit dashboard as a subprocess.
+    """Launch FastAPI backend and Next.js frontend as concurrent subprocesses.
 
     Args:
         args: Parsed CLI arguments (no command-specific attributes used).
         settings: Application settings loaded from environment.
 
     Side effects:
-        Runs ``streamlit run streamlit_app.py`` as a blocking subprocess.
-        Exits with code 1 if the streamlit_app.py file is not found.
+        Starts uvicorn (FastAPI) on port 8000 and Next.js dev server on port 3000.
+        Both are terminated gracefully on Ctrl+C or when either process exits.
     """
+    import signal
     import subprocess
 
-    # Find streamlit_app.py relative to project root
-    app_path = Path(__file__).resolve().parent.parent.parent / "streamlit_app.py"
-    if not app_path.exists():
-        print(f"Error: streamlit_app.py not found at {app_path}", file=sys.stderr)
+    project_root = Path(__file__).resolve().parent.parent.parent
+    frontend_dir = project_root / "frontend"
+
+    if not frontend_dir.exists():
+        print(f"Error: frontend/ not found at {frontend_dir}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Launching Streamlit dashboard: {app_path}")
-    subprocess.run(
-        [sys.executable, "-m", "streamlit", "run", str(app_path)],
-        check=True,
+    procs: list[subprocess.Popen] = []
+
+    def _shutdown(signum=None, frame=None):
+        for p in procs:
+            try:
+                p.terminate()
+            except OSError:
+                pass
+        for p in procs:
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
+
+    print("Starting FastAPI backend on http://127.0.0.1:8000")
+    api_proc = subprocess.Popen(
+        [
+            sys.executable, "-m", "uvicorn",
+            "byesamosa.api.main:app",
+            "--host", settings.host,
+            "--port", str(settings.port),
+            "--reload",
+        ],
+        cwd=str(project_root),
     )
+    procs.append(api_proc)
+
+    print("Starting Next.js frontend on http://localhost:3000")
+    frontend_proc = subprocess.Popen(
+        ["npm", "run", "dev"],
+        cwd=str(frontend_dir),
+    )
+    procs.append(frontend_proc)
+
+    print("\nBoth servers running. Press Ctrl+C to stop.\n")
+
+    try:
+        # Wait for either process to exit
+        while True:
+            for p in procs:
+                ret = p.poll()
+                if ret is not None:
+                    print(f"Process {p.args} exited with code {ret}. Shutting down...")
+                    _shutdown()
+                    sys.exit(ret)
+            import time
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+        _shutdown()
 
 
 def main() -> None:
@@ -287,7 +337,7 @@ def main() -> None:
     )
 
     # serve subcommand
-    subparsers.add_parser("serve", help="Launch Streamlit dashboard")
+    subparsers.add_parser("serve", help="Launch FastAPI + Next.js dashboard")
 
     args = parser.parse_args()
     settings = Settings()

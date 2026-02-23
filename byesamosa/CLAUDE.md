@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ByeSamosa is a personal Oura Ring data analyzer that replaces the $7/month subscription with AI-powered insights. Users manually download CSV exports from Oura's Membership Hub and import them via CLI. A Streamlit dashboard provides health metrics and AI-generated recommendations powered by Claude API, accessing the data layer directly (no API intermediary).
+ByeSamosa is a personal Oura Ring data analyzer that replaces the $7/month subscription with AI-powered insights. Users download CSV exports from Oura's Membership Hub (manually or via Playwright automation) and import them via CLI. A Next.js + Tailwind dashboard (warm editorial aesthetic) displays health metrics and AI-generated recommendations. A FastAPI backend exposes the Python data layer as REST endpoints.
 
 ## Development Commands
 
@@ -13,18 +13,21 @@ ByeSamosa is a personal Oura Ring data analyzer that replaces the $7/month subsc
 # Install Python dependencies (use uv for fast package management)
 uv sync
 
+# Install frontend dependencies
+cd frontend && npm install && cd ..
+
 # Copy environment template and add your ANTHROPIC_API_KEY
 cp .env.example .env
-
 ```
 
 ### Running the Application
 ```bash
-# Start the Streamlit dashboard
-streamlit run streamlit_app.py
-
-# Or use the CLI
+# Start both FastAPI backend (port 8000) + Next.js frontend (port 3000)
 python -m byesamosa.pipeline serve
+
+# Or run them separately:
+uvicorn byesamosa.api.main:app --reload          # FastAPI on :8000
+cd frontend && npm run dev                         # Next.js on :3000
 
 # Pull Oura export via browser automation
 python -m byesamosa.pipeline pull
@@ -46,17 +49,30 @@ python -c "from byesamosa.data.store import DataStore; from byesamosa.data.queri
 
 ### Testing
 ```bash
-# Run all tests (when test suite is implemented)
 pytest tests/
-
-# Run specific test file
 pytest tests/test_queries.py
-
-# Run with verbose output
 pytest -v
 ```
 
-## Architecture: Data Flow & Storage
+## Architecture
+
+### Stack
+- **Frontend**: Next.js 16 (App Router) + Tailwind v4 + Recharts + Framer Motion
+- **Backend**: FastAPI (thin wrapper over data layer) + Uvicorn
+- **Data layer**: Pydantic models + JSON file storage + Pandas baselines
+- **AI**: Claude API for daily health insights
+
+### Frontend → Backend Communication
+Next.js `next.config.ts` rewrites `/api/*` → `http://localhost:8000/api/*`, so frontend and backend appear same-origin (no CORS issues in dev).
+
+### API Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/dashboard` | GET | Scores, deltas, cached AI insight (above-the-fold) |
+| `/api/trends?days=30` | GET | Sleep score, HRV, RHR time series |
+| `/api/baselines?metric=sleep_score` | GET | Baseline band data for chart overlays |
+| `/api/workouts?days=30` | GET | Workout bars + readiness line data |
+| `/api/insights/refresh` | POST | Generate new AI insight (rate-limited 60s) |
 
 ### JSON-Based Storage (Not Database)
 
@@ -77,12 +93,6 @@ data/
     └── api_costs.json       # API spend tracking
 ```
 
-**Why JSON?**
-- Data is tiny (Oura generates ~1 row per day)
-- Eliminates database setup complexity
-- Files are human-readable and git-friendly for versioning
-- Streamlit reruns on each interaction (no caching = no race conditions with import pipeline)
-
 ### Data Pipeline Flow
 
 ```
@@ -90,7 +100,7 @@ data/
    → Playwright logs into Oura, downloads export, extracts CSVs to data/raw/
    OR
 1. (Manual) User downloads CSV from membership.ouraring.com/data-export
-2. python -m byesamosa.pipeline import --file export.csv
+2. python -m byesamosa.pipeline import --raw-dir data/raw/YYYY-MM-DD
    ↓
 3. Parser: CSV → Pydantic models → JSON (upsert/dedup by day)
    ↓
@@ -103,7 +113,7 @@ data/
 
 ## Schema Versioning Strategy
 
-**All Pydantic models include `schema_version: int = 1`**
+**All Pydantic models include `schema_version: int`**
 
 This handles two scenarios:
 1. **Oura changes export format** → Increment schema version, write migration script in `src/byesamosa/data/migrations.py`
@@ -111,39 +121,35 @@ This handles two scenarios:
 
 Raw CSV exports are always retained in `data/raw/` so data can be reprocessed if schema changes.
 
-## Conditional Features: Sleep Hypnogram (Deferred)
-
-**Sleep hypnogram visualization is deferred from current scope.** The data layer supports sleep phase data (`has_sleep_phases()` in queries.py), but the Streamlit dashboard does not currently render it.
-
 ## AI Engine Cost Protection
 
 **Rate limiting and token caps prevent runaway costs:**
 
-1. Streamlit refresh button enforces 1 request per 60 seconds (session-state timestamp check)
-2. `max_tokens=4096` cap in Claude API calls (~$0.05 per insight)
-3. All API calls logged to `data/logs/api_costs.json` with timestamp + estimated cost
+1. FastAPI insights endpoint enforces 1 request per 60 seconds (in-memory timestamp)
+2. Frontend RefreshButton shows cooldown timer after each request
+3. `max_tokens=4096` cap in Claude API calls (~$0.05 per insight)
+4. All API calls logged to `data/logs/api_costs.json` with timestamp + estimated cost
 
-## Dashboard Design (Streamlit)
+## Frontend Design
 
-**Streamlit reruns the script on each interaction (no startup caching).**
+**Aesthetic:** Warm editorial — cream backgrounds (#FDFBF7), serif headings (Playfair Display), clean sans body (DM Sans), warm amber/terracotta accents, generous whitespace, card-based layout with Framer Motion reveal animations.
 
-This eliminates race conditions between the import pipeline and the dashboard:
-- Streamlit reloads data from disk on each rerun → always fresh data
-- Performance: Data is ~365 rows/year, JSON parse is negligible (~1ms)
-- Dashboard calls DataStore/queries/AI engine directly — no API intermediary
+**Dashboard sections (scroll order):**
+1. Header + Refresh button
+2. Score cards (Sleep, Readiness, Activity) with radar charts
+3. AI Briefing (reasoning chain + action items)
+4. Vitals (HRV, RHR, Body Temp, Breathing Rate)
+5. Workout & Recovery (stacked bars + readiness line)
+6. Trend charts (Sleep Score with baseline band, HRV + RHR dual-axis)
+
+**Key decisions:**
+- Client-side fetching (`'use client'` + `useEffect`) — personal tool, no SEO needed
+- Recharts over Plotly (150KB vs 800KB, tree-shakeable)
+- Parallel fetch on mount via `Promise.all` for all endpoints
 
 ## Baseline Computation (Pandas)
 
-Baselines are computed via pandas rolling windows after each data import:
-
-```python
-# For each metric (sleep_score, readiness_score, etc.):
-df = pd.DataFrame(records)
-df["avg_7d"] = df[metric].rolling(7, min_periods=1).mean()
-df["avg_30d"] = df[metric].rolling(30, min_periods=1).mean()
-df["avg_90d"] = df[metric].rolling(90, min_periods=1).mean()
-df["std_30d"] = df[metric].rolling(30, min_periods=1).std()
-```
+Baselines are computed via pandas rolling windows after each data import.
 
 Tracked metrics: `sleep_score`, `readiness_score`, `activity_score`, `average_hrv`, `lowest_heart_rate`, `deep_sleep_duration`, `rem_sleep_duration`, `total_sleep_duration`, `efficiency`, `temperature_deviation`, `steps`, `active_calories`.
 
@@ -151,28 +157,38 @@ Baselines are saved to `data/processed/baselines.json` as a flat list of `Baseli
 
 ## Project Status
 
-**Phase 1 (Complete):** Project scaffolding, data models, mock data, DataStore, baseline queries
+**Phase 1 (Complete):** Project scaffolding, data models, DataStore, baseline queries
 **Phase 2 (Complete):** AI engine (prompts, Claude API integration, insight caching)
-**Phase 3 (Superseded):** API server — replaced by Streamlit direct data access. Code removed.
-**Phase 4 (Complete):** Streamlit Dashboard (Streamlit + Plotly). Hypnogram deferred.
-**Phase 5 (Complete):** Pipeline CLI orchestrator (`pipeline.py` and `importer.py`)
-**Phase 6 (In Progress):** Playwright automation for export download (`pull` command, Gmail OTP)
-
-See `docs/PLAN.md` for detailed implementation steps and dependencies.
+**Phase 3 (Complete):** Pipeline CLI orchestrator (`pipeline.py` and `importer.py`)
+**Phase 4 (Complete):** Playwright automation for export download (`pull` command, Gmail OTP)
+**Phase 5 (Complete):** UI Revamp — Next.js + FastAPI replaces Streamlit + Plotly
 
 ## Key Files
 
-- `docs/DESIGN.md`: Complete technical architecture and data models
-- `docs/PLAN.md`: Step-by-step implementation plan with verification checkpoints
-- `streamlit_app.py`: Streamlit dashboard entry point (calls data layer directly)
+**Backend (FastAPI):**
+- `src/byesamosa/api/main.py`: FastAPI app, CORS, router includes
+- `src/byesamosa/api/deps.py`: Dependency injection (DataStore + Settings)
+- `src/byesamosa/api/routers/`: Endpoint handlers (dashboard, trends, baselines, workouts, insights)
+
+**Data layer:**
 - `src/byesamosa/config.py`: Settings (loads from .env)
 - `src/byesamosa/data/models.py`: Pydantic models with schema versioning
 - `src/byesamosa/data/store.py`: JSON file read/write/upsert/dedup
 - `src/byesamosa/data/queries.py`: Baseline computation + helper queries
+
+**Frontend (Next.js):**
+- `frontend/app/page.tsx`: Main dashboard page (client component)
+- `frontend/app/layout.tsx`: Root layout with fonts
+- `frontend/components/`: All UI components (ScoreCard, AIBriefing, TrendCharts, etc.)
+- `frontend/lib/types.ts`: TypeScript interfaces matching Python models
+- `frontend/lib/api.ts`: Fetch wrappers for all endpoints
+
+**Pipeline:**
 - `src/byesamosa/pipeline.py`: CLI orchestrator (import, insights, serve, pull)
+- `src/byesamosa/ai/engine.py`: Claude API insight generation + caching
+- `src/byesamosa/ai/schemas.py`: AIInsight Pydantic model
 - `src/byesamosa/data/importer.py`: Oura CSV import pipeline
-- `src/byesamosa/data/export_pull.py`: Playwright browser automation for Oura export download
-- `src/byesamosa/data/gmail_otp.py`: Gmail IMAP OTP extraction for Oura login
+- `src/byesamosa/data/export_pull.py`: Playwright browser automation
 
 ## Environment Variables
 

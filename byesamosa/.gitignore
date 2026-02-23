@@ -5,6 +5,9 @@
 .env
 .venv/
 
+# Google OAuth credentials
+credentials.json
+
 # Python
 __pycache__/
 *.py[cod]

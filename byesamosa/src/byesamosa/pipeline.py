@@ -4,6 +4,7 @@ Usage:
     python -m byesamosa.pipeline import --raw-dir data/raw/2026-02-17 [--refresh]
     python -m byesamosa.pipeline insights [--date YYYY-MM-DD] [--force]
     python -m byesamosa.pipeline serve
+    python -m byesamosa.pipeline pull [--no-import]
 """
 
 import argparse
@@ -108,6 +109,54 @@ def cmd_insights(args: argparse.Namespace, settings: Settings) -> None:
     print(f"  Action items: {len(insight.actions)}")
 
 
+def cmd_pull(args: argparse.Namespace, settings: Settings) -> None:
+    """Pull Oura data export via browser automation."""
+    from byesamosa.data.export_pull import pull_oura_export
+
+    if not settings.oura_email:
+        print(
+            "Error: OURA_EMAIL is not set.\n"
+            "Add OURA_EMAIL=your-email@example.com to your .env file.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    raw_dir = settings.data_dir / "raw"
+
+    target_date = date.fromisoformat(args.date) if args.date else None
+
+    print(f"Pulling Oura export for {settings.oura_email}...")
+    result_path = pull_oura_export(
+        email=settings.oura_email,
+        raw_dir=raw_dir,
+        target_date=target_date,
+    )
+
+    if result_path is None:
+        print("No new export ready. Export has been requested, try again in ~48 hours.")
+        return
+
+    print(f"Export downloaded to {result_path}")
+
+    if args.no_import:
+        print("Skipping import (--no-import).")
+        return
+
+    # Run the import pipeline on the downloaded CSVs
+    from byesamosa.data.importer import import_oura_export
+
+    summary = import_oura_export(
+        raw_dir=result_path,
+        data_dir=settings.data_dir,
+        refresh=False,
+    )
+
+    print("Import complete:")
+    for dtype, count in summary.items():
+        print(f"  {dtype}: {count}")
+    print(f"  total: {sum(summary.values())}")
+
+
 def cmd_serve(args: argparse.Namespace, settings: Settings) -> None:
     """Launch the Streamlit dashboard."""
     import subprocess
@@ -166,6 +215,21 @@ def main() -> None:
         help="Regenerate even if cached insight exists",
     )
 
+    # pull subcommand
+    pull_parser = subparsers.add_parser(
+        "pull", help="Pull Oura data export via browser automation"
+    )
+    pull_parser.add_argument(
+        "--no-import",
+        action="store_true",
+        help="Download export but skip importing into processed store",
+    )
+    pull_parser.add_argument(
+        "--date",
+        type=str,
+        help="Download a specific export by date (YYYY-MM-DD), bypassing stale detection",
+    )
+
     # serve subcommand
     subparsers.add_parser("serve", help="Launch Streamlit dashboard")
 
@@ -176,6 +240,8 @@ def main() -> None:
         cmd_import(args, settings)
     elif args.command == "insights":
         cmd_insights(args, settings)
+    elif args.command == "pull":
+        cmd_pull(args, settings)
     elif args.command == "serve":
         cmd_serve(args, settings)
 

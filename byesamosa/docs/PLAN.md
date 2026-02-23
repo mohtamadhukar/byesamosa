@@ -214,6 +214,17 @@
 
 ---
 
+## Phase 5b: Automated Export Pull
+
+- [x] Add playwright dependency
+- [x] Add oura_email, gmail_otp_email, gmail_otp_app_password to config
+- [x] Create Gmail OTP module (gmail_otp.py)
+- [x] Create Playwright export module (export_pull.py)
+- [x] Add `pull` subcommand to pipeline.py
+- [~] Install, configure, and test
+
+---
+
 ## Phase 6: Tests & Setup
 
 ### Step 6.1: Update existing tests for v2
@@ -277,8 +288,6 @@ Step 6.2  test_parser.py  — Create parser test suite
 
 ## Not in Scope (Post-MVP)
 
-- Playwright automation for Oura export download
-- Gmail API for OTP
 - DuckDB migration
 - Authentication / multi-user
 - Deployment beyond localhost

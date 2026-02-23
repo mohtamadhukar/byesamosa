@@ -13,7 +13,7 @@ Oura Ring 4 subscription costs $7/month but delivers shallow insights. The Oura 
 | **Dashboard** | Streamlit + Plotly | Same Python stack, direct data access, fast to build for personal tool. No separate frontend build step. |
 | **Storage** | Local JSON files + pandas | Start simple with flat files. Raw exports in `data/raw/`, parsed/normalized data in `data/processed/` as JSON. Pandas for analytics/baseline queries. Can migrate to DuckDB later if needed. |
 | **AI** | Claude API (Anthropic Python SDK) | Structured output, strong reasoning for chains. Data context fits easily in context window. |
-| **Data Import** | Manual CSV download + CLI | Oura export is async (up to 48h) with email OTP auth — full automation not feasible for MVP. User downloads CSV from Membership Hub, imports via CLI. Playwright automation deferred to post-MVP. |
+| **Data Import** | Manual CSV download + CLI; optional `pull` command (Playwright) | Oura export is async (up to 48h) with email OTP auth. Manual download always available. `pull` command automates login, OTP, and download via Playwright. |
 | **Package mgr** | uv | Fast modern Python packaging. |
 
 ---
@@ -339,11 +339,11 @@ class AIInsight(BaseModel):
 - `python -m byesamosa.pipeline import --file export.csv` runs full pipeline
 - `python -m byesamosa.pipeline serve` launches Streamlit
 
-**Phase 6 (Post-MVP): Playwright Automation**
-- Gmail API integration for email OTP retrieval
-- Playwright login flow with OTP
-- Export request + readiness polling
-- Automated download and import
+**Phase 6 (In Progress): Playwright Automation (`pull` command)**
+- Gmail IMAP OTP extraction (`gmail_otp.py`)
+- Playwright login flow with OTP (`export_pull.py`)
+- Export request + download + zip extraction
+- `pull` subcommand in pipeline.py (with `--no-import`, `--date` flags)
 
 ---
 
@@ -361,8 +361,8 @@ dependencies = [
     "streamlit",
     "plotly",
 ]
-# Post-MVP (Playwright automation):
-# "playwright>=1.41.0",
+# Playwright automation (pull command):
+# "playwright>=1.41.0",  # included in dependencies
 ```
 
 ---

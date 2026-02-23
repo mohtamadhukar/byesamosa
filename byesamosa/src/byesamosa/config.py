@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     anthropic_api_key: str = "placeholder"  # Will be loaded from .env
+    oura_email: str = ""
+    gmail_otp_email: str = ""
+    gmail_otp_app_password: str = ""
     data_dir: Path = Path("data")
     host: str = "127.0.0.1"
     port: int = 8000

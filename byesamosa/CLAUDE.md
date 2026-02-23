@@ -25,10 +25,18 @@ streamlit run streamlit_app.py
 
 # Or use the CLI
 python -m byesamosa.pipeline serve
+
+# Pull Oura export via browser automation
+python -m byesamosa.pipeline pull
 ```
 
 ### Data Operations
 ```bash
+# Pull Oura export via browser automation (requires playwright install chromium)
+python -m byesamosa.pipeline pull
+python -m byesamosa.pipeline pull --no-import
+python -m byesamosa.pipeline pull --date 2026-02-23
+
 # Import Oura CSV export (place exported CSVs in a dated directory under data/raw/)
 python -m byesamosa.pipeline import --raw-dir data/raw/YYYY-MM-DD
 
@@ -78,7 +86,10 @@ data/
 ### Data Pipeline Flow
 
 ```
-1. User downloads CSV from membership.ouraring.com/data-export
+0. (Automated) python -m byesamosa.pipeline pull
+   → Playwright logs into Oura, downloads export, extracts CSVs to data/raw/
+   OR
+1. (Manual) User downloads CSV from membership.ouraring.com/data-export
 2. python -m byesamosa.pipeline import --file export.csv
    ↓
 3. Parser: CSV → Pydantic models → JSON (upsert/dedup by day)
@@ -145,7 +156,7 @@ Baselines are saved to `data/processed/baselines.json` as a flat list of `Baseli
 **Phase 3 (Superseded):** API server — replaced by Streamlit direct data access. Code removed.
 **Phase 4 (Complete):** Streamlit Dashboard (Streamlit + Plotly). Hypnogram deferred.
 **Phase 5 (Complete):** Pipeline CLI orchestrator (`pipeline.py` and `importer.py`)
-**Phase 6 (Post-MVP):** Playwright automation for export download
+**Phase 6 (In Progress):** Playwright automation for export download (`pull` command, Gmail OTP)
 
 See `docs/PLAN.md` for detailed implementation steps and dependencies.
 
@@ -158,5 +169,14 @@ See `docs/PLAN.md` for detailed implementation steps and dependencies.
 - `src/byesamosa/data/models.py`: Pydantic models with schema versioning
 - `src/byesamosa/data/store.py`: JSON file read/write/upsert/dedup
 - `src/byesamosa/data/queries.py`: Baseline computation + helper queries
-- `src/byesamosa/pipeline.py`: CLI orchestrator (import, insights, serve)
+- `src/byesamosa/pipeline.py`: CLI orchestrator (import, insights, serve, pull)
 - `src/byesamosa/data/importer.py`: Oura CSV import pipeline
+- `src/byesamosa/data/export_pull.py`: Playwright browser automation for Oura export download
+- `src/byesamosa/data/gmail_otp.py`: Gmail IMAP OTP extraction for Oura login
+
+## Environment Variables
+
+- `ANTHROPIC_API_KEY`: Claude API key (required for AI insights)
+- `OURA_EMAIL`: Oura account email (required for pull command)
+- `GMAIL_OTP_EMAIL`: Gmail address for receiving Oura OTP codes
+- `GMAIL_OTP_APP_PASSWORD`: Gmail App Password (16-char) for IMAP access

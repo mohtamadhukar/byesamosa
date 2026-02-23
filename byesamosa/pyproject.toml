@@ -11,6 +11,7 @@ dependencies = [
     "python-dotenv",
     "streamlit",
     "plotly",
+    "playwright>=1.41.0",
 ]
 
 [project.scripts]

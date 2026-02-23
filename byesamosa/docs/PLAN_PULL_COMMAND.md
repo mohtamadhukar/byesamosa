@@ -17,15 +17,15 @@ ByeSamosa currently requires manual CSV download from Oura's Membership Hub. Thi
 
 ## Implementation Steps
 
-- [ ] **1. Add dependencies** (`pyproject.toml`)
+- [x] **1. Add dependencies** (`pyproject.toml`)
   - Add `"playwright>=1.41.0"` to dependencies
   - Add `"google-api-python-client>=2.0"`, `"google-auth-oauthlib>=1.0"` for Gmail API
 
-- [ ] **2. Add `oura_email` to config** (`config.py`)
+- [x] **2. Add `oura_email` to config** (`config.py`)
   - Add `oura_email: str = ""` field to `Settings` class
   - Add `OURA_EMAIL=your-email@example.com` to `.env.example`
 
-- [ ] **3. Create Gmail OTP module** (`gmail_otp.py`)
+- [x] **3. Create Gmail OTP module** (`gmail_otp.py`)
   - Gmail API with `gmail.readonly` OAuth2 scope
   - On first run: opens browser for Google OAuth consent, saves token to `data/.gmail_token.json` (git-ignored)
   - `fetch_oura_otp(timeout_seconds: int = 120) -> str`
@@ -35,7 +35,7 @@ ByeSamosa currently requires manual CSV download from Oura's Membership Hub. Thi
     4. Return the code string
   - `credentials.json` (Google OAuth client) stored in project root (git-ignored)
 
-- [ ] **4. Create Playwright export module** (`export_pull.py`)
+- [x] **4. Create Playwright export module** (`export_pull.py`)
   - `pull_oura_export(email: str, download_dir: Path, raw_dir: Path) -> Path | None`
   - **Stale export detection** using existing `data/raw/` folders:
     - Scan `data/raw/` for date-stamped folder names, find the latest (e.g., `2026-02-17`)
@@ -62,7 +62,7 @@ ByeSamosa currently requires manual CSV download from Oura's Membership Hub. Thi
   - Error handling: try/finally for `browser.close()`, catch `TimeoutError` with clear messages
   - After ZIP extraction, handle both flat and nested CSV structures
 
-- [ ] **5. Add `pull` subcommand to pipeline.py**
+- [x] **5. Add `pull` subcommand to pipeline.py**
   - Add argparse subparser `pull` with `--no-import` flag
   - `cmd_pull()`:
     1. Validate `OURA_EMAIL` is set (exit with error if not)
@@ -73,7 +73,7 @@ ByeSamosa currently requires manual CSV download from Oura's Membership Hub. Thi
     6. Print summary
   - Wire into argparse dispatch block
 
-- [ ] **6. Install, configure, and test**
+- [~] **6. Install, configure, and test**
   - `uv sync && playwright install chromium`
   - Set up Google Cloud OAuth credentials (one-time)
   - Test with a new data pull that has already been requested on Oura (should be ready to download)

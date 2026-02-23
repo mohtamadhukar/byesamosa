@@ -21,6 +21,7 @@ from byesamosa.data.queries import (
     get_deltas,
     get_latest_day,
     get_trends,
+    get_workout_recovery_data,
     has_sleep_phases,
 )
 from byesamosa.data.store import DataStore
@@ -47,12 +48,13 @@ def load_data():
     store = DataStore(DATA_DIR)
     latest = get_latest_day(store)
     if not latest:
-        return None, None, None, None
+        return None, None, None, None, {}
     deltas = get_deltas(store)
     sleep_trend = get_trends(store, "sleep_score", days=30)
     hrv_trend = get_trends(store, "average_hrv", days=30)
     rhr_trend = get_trends(store, "lowest_heart_rate", days=30)
     insight = load_cached_insight(latest["day"], DATA_DIR)
+    workout_recovery = get_workout_recovery_data(store)
     return (
         latest,
         deltas,
@@ -62,11 +64,12 @@ def load_data():
             "lowest_heart_rate": rhr_trend,
         },
         insight,
+        workout_recovery,
     )
 
 
 data = load_data()
-latest, deltas, trends, insight = data
+latest, deltas, trends, insight, workout_recovery = data
 
 # ---------------------------------------------------------------------------
 # Header
@@ -305,6 +308,65 @@ with col_breath:
     )
     if insight and "breath" in insight.vital_annotations:
         st.caption(insight.vital_annotations["breath"].text)
+
+# --- Workout & Recovery ---
+st.divider()
+if workout_recovery and workout_recovery.get("workouts"):
+    st.subheader("Workout & Recovery")
+
+    fig_workout = make_subplots(specs=[[{"secondary_y": True}]])
+
+    # Color palette for activity types
+    activity_colors = [
+        "#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899",
+        "#14b8a6", "#f97316",
+    ]
+    activity_types = workout_recovery["activity_types"]
+    color_map = {a: activity_colors[i % len(activity_colors)] for i, a in enumerate(activity_types)}
+
+    # Bar traces: one per activity type, stacked
+    for activity in activity_types:
+        activity_workouts = [w for w in workout_recovery["workouts"] if w["activity"] == activity]
+        fig_workout.add_trace(
+            go.Bar(
+                x=[w["day"] for w in activity_workouts],
+                y=[w["calories"] for w in activity_workouts],
+                name=activity,
+                marker_color=color_map[activity],
+            ),
+            secondary_y=False,
+        )
+
+    # Line trace: continuous readiness across the window
+    recovery_readiness = workout_recovery["readiness"]
+    if recovery_readiness:
+        fig_workout.add_trace(
+            go.Scatter(
+                x=[r["day"] for r in recovery_readiness],
+                y=[r["readiness"] for r in recovery_readiness],
+                mode="lines+markers",
+                name="Readiness",
+                line=dict(color="#22c55e", width=2),
+                marker=dict(size=3),
+            ),
+            secondary_y=True,
+        )
+
+    fig_workout.update_layout(
+        barmode="stack",
+        margin=dict(l=40, r=40, t=30, b=40),
+        height=350,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+    )
+    fig_workout.update_yaxes(title_text="Calories", secondary_y=False)
+    fig_workout.update_yaxes(title_text="Readiness Score", secondary_y=True)
+    st.plotly_chart(fig_workout, use_container_width=True, key="workout_recovery")
+
+    st.caption("Readiness shows the full recovery arc — dips after workouts and how many days to recover.")
+    if workout_recovery["excluded_count"] > 0:
+        st.caption(
+            f"{workout_recovery['excluded_count']} workout(s) excluded due to missing calorie data."
+        )
 
 # --- Trend Charts ---
 st.divider()

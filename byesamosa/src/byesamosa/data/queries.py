@@ -1,7 +1,7 @@
 """Query and analytics functions for Oura Ring data."""
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -237,3 +237,58 @@ def has_sleep_phases(store: DataStore) -> bool:
     """Check if sleep phase interval data is available."""
     phases = store.load_sleep_phases()
     return len(phases) > 0
+
+
+def get_workout_recovery_data(store: DataStore, days: int = 30) -> dict:
+    """Get workout and next-day readiness data for overlay chart.
+
+    Returns dict with keys: workouts, readiness, activity_types, excluded_count.
+    Workouts with calories=None are excluded.
+    """
+    workouts = store.load_workouts()
+    readiness_records = store.load_readiness()
+
+    if not workouts:
+        return {"workouts": [], "readiness": [], "activity_types": [], "excluded_count": 0}
+
+    # Filter out workouts with no calorie data
+    valid_workouts = [w for w in workouts if w.calories is not None]
+    excluded_count = len(workouts) - len(valid_workouts)
+
+    if not valid_workouts:
+        return {"workouts": [], "readiness": [], "activity_types": [], "excluded_count": excluded_count}
+
+    # Filter to last N days from latest workout date
+    latest_workout_day = max(w.day for w in valid_workouts)
+    cutoff = latest_workout_day - timedelta(days=days)
+    valid_workouts = [w for w in valid_workouts if w.day >= cutoff]
+
+    # Build readiness lookup: day -> score
+    readiness_lookup: dict[date, int | None] = {
+        r.day: r.score for r in readiness_records
+    }
+
+    # Build workout list
+    workout_list = [
+        {"day": w.day.isoformat(), "activity": w.activity or "Unknown", "calories": w.calories}
+        for w in sorted(valid_workouts, key=lambda w: w.day)
+    ]
+
+    # Build continuous readiness list for the full window
+    readiness_list = []
+    current = cutoff
+    while current <= latest_workout_day + timedelta(days=1):
+        score = readiness_lookup.get(current)
+        if score is not None:
+            readiness_list.append({"day": current.isoformat(), "readiness": score})
+        current += timedelta(days=1)
+
+    # Sorted unique activity types
+    activity_types = sorted(set(w.activity or "Unknown" for w in valid_workouts))
+
+    return {
+        "workouts": workout_list,
+        "readiness": readiness_list,
+        "activity_types": activity_types,
+        "excluded_count": excluded_count,
+    }

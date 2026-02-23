@@ -4,6 +4,7 @@ Automates browser login to Oura's Membership Hub, handles OTP via Gmail API,
 and downloads/requests data exports with stale detection.
 """
 
+import os
 import re
 import shutil
 import time
@@ -11,11 +12,32 @@ import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 from byesamosa.data.gmail_otp import fetch_oura_otp
 
 OURA_EXPORT_URL = "https://membership.ouraring.com/data-export"
+
+# --- Timeout constants (milliseconds) ---
+NAV_TIMEOUT_MS = 30_000        # Page navigation / networkidle
+ELEMENT_WAIT_MS = 10_000       # Waiting for an element to appear or become visible
+OTP_FLOW_TIMEOUT_MS = 15_000   # OTP send-code click and input field wait
+DOWNLOAD_TIMEOUT_MS = 120_000  # Large ZIP download from Oura
+COOKIE_BANNER_MS = 3_000       # Cookie consent banner visibility check
+COOKIE_BANNER_ALT_MS = 1_000   # Fallback cookie banner check
+
+# --- Sleep constants (seconds) ---
+# Brief pause after dismissing cookie banners so the DOM settles
+COOKIE_DISMISS_PAUSE_S = 0.5
+# Pause after navigating to export page to let dynamic content render
+EXPORT_PAGE_SETTLE_S = 3
+# Pause after clicking an export-related button to let server respond
+BUTTON_RESPONSE_PAUSE_S = 2
+# Polling interval while waiting for OTP redirect to complete
+OTP_REDIRECT_POLL_S = 1
+# Maximum number of OTP redirect polling iterations
+OTP_REDIRECT_MAX_POLLS = 30
 
 
 def _get_latest_raw_date(raw_dir: Path) -> date | None:
@@ -70,54 +92,54 @@ def _dismiss_cookie_banner(page) -> None:
     try:
         # OneTrust cookie banner on membership.ouraring.com
         accept_btn = page.locator("#onetrust-accept-btn-handler").first
-        if accept_btn.is_visible(timeout=3000):
-            accept_btn.click()
-            page.wait_for_timeout(500)
+        if accept_btn.is_visible(timeout=COOKIE_BANNER_MS):
+            accept_btn.click(timeout=ELEMENT_WAIT_MS)
+            page.wait_for_timeout(int(COOKIE_DISMISS_PAUSE_S * 1000))
             return
-    except (PlaywrightTimeout, Exception):
+    except (PlaywrightTimeout, PlaywrightError):
         pass
     try:
         accept_btn = page.locator("button:has-text('Accept'), button:has-text('Got it'), button:has-text('OK')").first
-        if accept_btn.is_visible(timeout=1000):
-            accept_btn.click()
-            page.wait_for_timeout(500)
-    except (PlaywrightTimeout, Exception):
+        if accept_btn.is_visible(timeout=COOKIE_BANNER_ALT_MS):
+            accept_btn.click(timeout=ELEMENT_WAIT_MS)
+            page.wait_for_timeout(int(COOKIE_DISMISS_PAUSE_S * 1000))
+    except (PlaywrightTimeout, PlaywrightError):
         pass
 
 
 def _login(page, email: str) -> None:
     """Login to Oura via the membership hub sign-in."""
-    page.wait_for_load_state("load")
-    page.goto(OURA_EXPORT_URL, wait_until="networkidle")
+    page.wait_for_load_state("load", timeout=NAV_TIMEOUT_MS)
+    page.goto(OURA_EXPORT_URL, wait_until="networkidle", timeout=NAV_TIMEOUT_MS)
 
     _dismiss_cookie_banner(page)
 
     # Fill email and submit
     email_input = page.locator("input[type='email'], input[name='email']").first
-    email_input.fill(email)
+    email_input.fill(email, timeout=ELEMENT_WAIT_MS)
 
     continue_btn = page.locator("button:has-text('Continue'), button[type='submit']").first
-    continue_btn.click()
+    continue_btn.click(timeout=ELEMENT_WAIT_MS)
 
     # Oura shows a "Send code" page — click it to trigger the OTP email
     send_code_btn = page.locator("button:has-text('Send code')").first
     otp_requested_at = time.time()
-    send_code_btn.click(timeout=15000)
+    send_code_btn.click(timeout=OTP_FLOW_TIMEOUT_MS)
     print("Clicked 'Send code' — OTP email should arrive shortly.")
 
     # Wait for the OTP input page to load
-    page.wait_for_selector("#otp-code", timeout=15000)
+    page.wait_for_selector("#otp-code", timeout=OTP_FLOW_TIMEOUT_MS)
 
     # Fetch OTP from Gmail — only accept emails after we clicked Send code
     otp = fetch_oura_otp(sent_after=otp_requested_at)
 
     # Fill the OTP input and submit
-    page.fill("#otp-code", otp)
-    page.locator("#submit-button").click()
+    page.fill("#otp-code", otp, timeout=ELEMENT_WAIT_MS)
+    page.locator("#submit-button").click(timeout=ELEMENT_WAIT_MS)
 
     # Wait for redirect after OTP submit
-    for i in range(30):
-        page.wait_for_timeout(1000)
+    for _ in range(OTP_REDIRECT_MAX_POLLS):
+        page.wait_for_timeout(int(OTP_REDIRECT_POLL_S * 1000))
         if "/authn/" not in page.url:
             break
     if "/authn/" in page.url:
@@ -125,6 +147,26 @@ def _login(page, email: str) -> None:
         body_text = page.inner_text("body")
         print(f"Warning: still on auth page. Page text: {body_text[:200]}")
         raise PlaywrightTimeout("Login did not complete — OTP may have expired")
+
+
+def _validate_download_dir(raw_dir: Path) -> None:
+    """Ensure the download directory exists and is writable. Create if needed."""
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    if not os.access(raw_dir, os.W_OK):
+        raise PermissionError(
+            f"Download directory is not writable: {raw_dir}"
+        )
+
+
+def _load_oura_email() -> str:
+    """Load OURA_EMAIL from environment, raising ValueError if not set."""
+    email = os.environ.get("OURA_EMAIL", "").strip()
+    if not email:
+        raise ValueError(
+            "OURA_EMAIL is not set. "
+            "Add OURA_EMAIL=your-email@example.com to your .env file."
+        )
+    return email
 
 
 def pull_oura_export(
@@ -142,6 +184,8 @@ def pull_oura_export(
         or None if an export was requested (not yet ready).
         The folder name uses the export's date from the Oura page.
     """
+    _validate_download_dir(raw_dir)
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         try:
@@ -154,9 +198,9 @@ def pull_oura_export(
             # After login we land on the hub — click "Export data" link
             if "/data-export" not in page.url:
                 export_link = page.locator("a:has-text('Export'), a:has-text('export'), a[href*='data-export']").first
-                export_link.click(timeout=10000)
-                page.wait_for_load_state("networkidle")
-                page.wait_for_timeout(3000)
+                export_link.click(timeout=ELEMENT_WAIT_MS)
+                page.wait_for_load_state("networkidle", timeout=NAV_TIMEOUT_MS)
+                page.wait_for_timeout(int(EXPORT_PAGE_SETTLE_S * 1000))
 
             print(f"Export page: {page.url}")
 
@@ -210,6 +254,9 @@ def pull_oura_export(
             print(f"Browser operation timed out: {e}")
             print("Try running the command again. If the issue persists, check your internet connection.")
             return None
+        except PlaywrightError as e:
+            print(f"Browser error: {e}")
+            return None
         finally:
             browser.close()
 
@@ -227,8 +274,8 @@ def _download_export(page, target_row: dict, download_dir: Path) -> Path:
     else:
         raise RuntimeError("Could not find download button on export page.")
 
-    with page.expect_download(timeout=120000) as download_info:
-        btn.click()
+    with page.expect_download(timeout=DOWNLOAD_TIMEOUT_MS) as download_info:
+        btn.click(timeout=ELEMENT_WAIT_MS)
 
     download = download_info.value
     zip_path = download_dir / download.suggested_filename
@@ -271,16 +318,16 @@ def _request_new_export(page) -> None:
     request_btn = page.locator("button:has-text('Request your data')").first
 
     try:
-        request_btn.scroll_into_view_if_needed()
-        request_btn.click(timeout=10000)
-        page.wait_for_timeout(2000)
+        request_btn.scroll_into_view_if_needed(timeout=ELEMENT_WAIT_MS)
+        request_btn.click(timeout=ELEMENT_WAIT_MS)
+        page.wait_for_timeout(int(BUTTON_RESPONSE_PAUSE_S * 1000))
         print("Export requested. Run `pull` again in ~48 hours.")
     except PlaywrightTimeout:
         # Try force click as fallback
         try:
-            request_btn.click(force=True)
-            page.wait_for_timeout(2000)
+            request_btn.click(force=True, timeout=ELEMENT_WAIT_MS)
+            page.wait_for_timeout(int(BUTTON_RESPONSE_PAUSE_S * 1000))
             print("Export requested. Run `pull` again in ~48 hours.")
-        except Exception:
+        except PlaywrightError:
             print("Could not find the export request button. The page layout may have changed.")
             print("Please request the export manually at: https://membership.ouraring.com/data-export")

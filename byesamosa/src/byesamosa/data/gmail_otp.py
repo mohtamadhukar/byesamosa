@@ -9,6 +9,7 @@ import email.message
 import email.utils
 import imaplib
 import re
+import ssl
 import time
 from datetime import datetime, timezone
 
@@ -46,10 +47,12 @@ def fetch_oura_otp(sent_after: float | None = None, timeout_seconds: int = 120) 
 
     print("Waiting for Oura OTP email...")
     start = time.time()
+    ssl_context = ssl.create_default_context()
 
     while time.time() - start < timeout_seconds:
+        mail = None
         try:
-            mail = imaplib.IMAP4_SSL("imap.gmail.com")
+            mail = imaplib.IMAP4_SSL("imap.gmail.com", ssl_context=ssl_context)
             mail.login(settings.gmail_otp_email, settings.gmail_otp_app_password)
             mail.select("inbox")
 
@@ -76,12 +79,16 @@ def fetch_oura_otp(sent_after: float | None = None, timeout_seconds: int = 120) 
                 otp = _extract_otp(msg)
                 if otp:
                     print(f"OTP retrieved: {otp}")
-                    mail.logout()
                     return otp
 
-            mail.logout()
         except imaplib.IMAP4.error as e:
             print(f"IMAP error: {e}")
+        finally:
+            if mail is not None:
+                try:
+                    mail.logout()
+                except Exception:
+                    pass
 
         time.sleep(5)
 
@@ -95,10 +102,22 @@ def _extract_otp(msg: email.message.Message) -> str | None:
     """Extract 6-digit OTP code from an email message."""
     body = _get_body_text(msg)
     if not body:
+        print("Could not extract text body from Oura email.")
         return None
 
+    # Primary: standalone 6-digit code (word boundary)
     match = re.search(r"\b(\d{6})\b", body)
-    return match.group(1) if match else None
+    if match:
+        return match.group(1)
+
+    # Fallback: 6-digit code preceded by common labels like "code: 123456"
+    match = re.search(r"(?:code|otp|pin|verification)[:\s]+(\d{6})", body, re.IGNORECASE)
+    if match:
+        return match.group(1)
+
+    print("OTP regex did not match any 6-digit code in email body. "
+          f"Body preview: {body[:200]!r}")
+    return None
 
 
 def _get_body_text(msg: email.message.Message) -> str | None:

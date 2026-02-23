@@ -20,7 +20,18 @@ logger = logging.getLogger(__name__)
 
 
 def cmd_import(args: argparse.Namespace, settings: Settings) -> None:
-    """Run the import pipeline: CSV -> JSON store -> baselines."""
+    """Import Oura CSV export into the processed JSON store.
+
+    Args:
+        args: Parsed CLI arguments. Expected attributes:
+            - raw_dir (str): Path to directory containing exported CSV files.
+            - refresh (bool): If True, delete existing processed data before importing.
+        settings: Application settings loaded from environment.
+
+    Side effects:
+        Reads CSV files from raw_dir, writes normalized JSON to settings.data_dir/processed/,
+        and recomputes baselines. Exits with code 1 if raw_dir does not exist.
+    """
     from byesamosa.data.importer import import_oura_export
 
     raw_dir = Path(args.raw_dir)
@@ -41,7 +52,19 @@ def cmd_import(args: argparse.Namespace, settings: Settings) -> None:
 
 
 def cmd_insights(args: argparse.Namespace, settings: Settings) -> None:
-    """Generate AI insight for a given date (default: latest)."""
+    """Generate an AI-powered health insight for a given date.
+
+    Args:
+        args: Parsed CLI arguments. Expected attributes:
+            - date (str | None): Target date in YYYY-MM-DD format. Defaults to latest day in store.
+            - force (bool): If True, regenerate even if a cached insight exists.
+        settings: Application settings loaded from environment.
+
+    Side effects:
+        Reads processed data from settings.data_dir, calls the Claude API to generate
+        an insight, and caches the result to data/insights/. Logs estimated API cost.
+        Exits with code 1 if no data is found in the store.
+    """
     from byesamosa.ai.engine import (
         cache_insight,
         generate_insight,
@@ -110,7 +133,23 @@ def cmd_insights(args: argparse.Namespace, settings: Settings) -> None:
 
 
 def cmd_pull(args: argparse.Namespace, settings: Settings) -> None:
-    """Pull Oura data export via browser automation."""
+    """Pull Oura data export via Playwright browser automation and optionally import.
+
+    Launches a Chromium browser, logs into Oura's Membership Hub using OTP
+    retrieved via Gmail IMAP, and downloads the latest data export. If a new
+    export is not yet ready, requests one.
+
+    Args:
+        args: Parsed CLI arguments. Expected attributes:
+            - date (str | None): Download a specific export by date (YYYY-MM-DD).
+            - no_import (bool): If True, download only without running the import pipeline.
+        settings: Application settings loaded from environment.
+
+    Side effects:
+        Opens a browser window, connects to Gmail via IMAP for OTP retrieval,
+        downloads and extracts ZIP files to data/raw/. Optionally runs the full
+        import pipeline. Exits with code 1 if OURA_EMAIL is not configured.
+    """
     from byesamosa.data.export_pull import pull_oura_export
 
     if not settings.oura_email:
@@ -126,11 +165,15 @@ def cmd_pull(args: argparse.Namespace, settings: Settings) -> None:
     target_date = date.fromisoformat(args.date) if args.date else None
 
     print(f"Pulling Oura export for {settings.oura_email}...")
-    result_path = pull_oura_export(
-        email=settings.oura_email,
-        raw_dir=raw_dir,
-        target_date=target_date,
-    )
+    try:
+        result_path = pull_oura_export(
+            email=settings.oura_email,
+            raw_dir=raw_dir,
+            target_date=target_date,
+        )
+    except Exception:
+        logger.exception("Pull failed unexpectedly")
+        raise
 
     if result_path is None:
         print("No new export ready. Export has been requested, try again in ~48 hours.")
@@ -158,7 +201,16 @@ def cmd_pull(args: argparse.Namespace, settings: Settings) -> None:
 
 
 def cmd_serve(args: argparse.Namespace, settings: Settings) -> None:
-    """Launch the Streamlit dashboard."""
+    """Launch the Streamlit dashboard as a subprocess.
+
+    Args:
+        args: Parsed CLI arguments (no command-specific attributes used).
+        settings: Application settings loaded from environment.
+
+    Side effects:
+        Runs ``streamlit run streamlit_app.py`` as a blocking subprocess.
+        Exits with code 1 if the streamlit_app.py file is not found.
+    """
     import subprocess
 
     # Find streamlit_app.py relative to project root
@@ -175,7 +227,11 @@ def cmd_serve(args: argparse.Namespace, settings: Settings) -> None:
 
 
 def main() -> None:
-    """Entry point for the ByeSamosa CLI."""
+    """Entry point for the ByeSamosa CLI.
+
+    Parses command-line arguments and dispatches to the appropriate subcommand
+    handler (import, insights, pull, or serve).
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",

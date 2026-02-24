@@ -180,7 +180,7 @@
 - **Files:** `src/byesamosa/data/importer.py` — **NEW**
 - **Import pipeline flow:**
   ```
-  data/raw/YYYY-MM-DD/*.csv (manually placed)
+  data/raw/YYYY-MM-DDThh-mm-ssTZ/*.csv (manually placed or pulled)
           │
           ▼
     1. PARSE: CSV → Pydantic (semicolon-delim, JSON cols)
@@ -197,7 +197,7 @@
   3. Compute → Recompute baselines
   4. Return summary dict with counts
 - **Why upsert:** Each Oura export contains full history (~71 days). Upsert is idempotent and handles retroactive score corrections.
-- **Raw storage convention:** `data/raw/YYYY-MM-DD/*.csv` — date of export, all CSVs flat in folder.
+- **Raw storage convention:** `data/raw/YYYY-MM-DDThh-mm-ssTZ/*.csv` — export date + pull timestamp + timezone, all CSVs flat in folder.
 
 ### Step 5.2: Pipeline CLI orchestrator
 - **Files:** `src/byesamosa/pipeline.py`

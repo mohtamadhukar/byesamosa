@@ -41,7 +41,7 @@ python -m byesamosa.pipeline pull --no-import
 python -m byesamosa.pipeline pull --date 2026-02-23
 
 # Import Oura CSV export (place exported CSVs in a dated directory under data/raw/)
-python -m byesamosa.pipeline import --raw-dir data/raw/YYYY-MM-DD
+python -m byesamosa.pipeline import --raw-dir data/raw/YYYY-MM-DDThh-mm-ssTZ
 
 # Compute/recompute baselines (rolling averages)
 python -c "from byesamosa.data.store import DataStore; from byesamosa.data.queries import compute_baselines; from pathlib import Path; compute_baselines(DataStore(Path('data')))"
@@ -80,7 +80,7 @@ Next.js `next.config.ts` rewrites `/api/*` → `http://localhost:8000/api/*`, so
 
 ```
 data/
-├── raw/                     # Untouched CSV exports from Oura
+├── raw/                     # Untouched CSV exports from Oura (dirs named YYYY-MM-DDThh-mm-ssTZ)
 ├── processed/               # Normalized JSON (source of truth for API)
 │   ├── daily_sleep.json
 │   ├── daily_readiness.json
@@ -100,7 +100,7 @@ data/
    → Playwright logs into Oura, downloads export, extracts CSVs to data/raw/
    OR
 1. (Manual) User downloads CSV from membership.ouraring.com/data-export
-2. python -m byesamosa.pipeline import --raw-dir data/raw/YYYY-MM-DD
+2. python -m byesamosa.pipeline import --raw-dir data/raw/YYYY-MM-DDThh-mm-ssTZ
    ↓
 3. Parser: CSV → Pydantic models → JSON (upsert/dedup by day)
    ↓

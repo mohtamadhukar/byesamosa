@@ -55,7 +55,7 @@ ByeSamosa currently requires manual CSV download from Oura's Membership Hub. Thi
     8. Navigate to data export page
   - Export handling:
     9. Parse the "Previous requests" table to get export dates + status
-    10. Find latest `data/raw/YYYY-MM-DD/` folder for comparison
+    10. Find latest `data/raw/YYYY-MM-DDThh-mm-ssTZ/` folder for comparison
     11. Apply stale detection logic (see above)
     12. If downloading: click download icon, save ZIP, extract CSVs to `download_dir`, return path
     13. If requesting: click request button, print "Export requested. Run `pull` again in ~48 hours.", return `None`
@@ -66,7 +66,7 @@ ByeSamosa currently requires manual CSV download from Oura's Membership Hub. Thi
   - Add argparse subparser `pull` with `--no-import` flag
   - `cmd_pull()`:
     1. Validate `OURA_EMAIL` is set (exit with error if not)
-    2. Create `data/raw/YYYY-MM-DD/` directory
+    2. Create `data/raw/YYYY-MM-DDThh-mm-ssTZ/` directory
     3. Call `pull_oura_export(email, download_dir, data_dir)`
     4. If `None` returned → "No new export ready. Export has been requested, try again in ~48 hours."
     5. If path returned and `--no-import` not set → call existing `import_oura_export()` from `importer.py`
@@ -82,7 +82,7 @@ ByeSamosa currently requires manual CSV download from Oura's Membership Hub. Thi
 
 ## Stale Export Detection
 
-Uses existing `data/raw/` folder names (e.g., `data/raw/2026-02-17/`) as the source of truth — no extra state file.
+Uses existing `data/raw/` folder names (e.g., `data/raw/2026-02-17T10-51-39CST/`) as the source of truth — no extra state file. The date prefix (first 10 chars) is used for comparison.
 
 The export page shows a "Previous requests" list:
 ```
@@ -91,10 +91,10 @@ The export page shows a "Previous requests" list:
 ```
 
 Logic:
-1. Find the latest date-stamped folder in `data/raw/` (e.g., `2026-02-17`)
+1. Find the latest date-stamped folder in `data/raw/` (e.g., `2026-02-17T10-51-39CST`) — date extracted from first 10 chars
 2. Parse all rows from the "Previous requests" list on the export page
 3. Find the newest row with a ready status (green dot)
-4. **Newer than latest raw folder** → download it into `data/raw/YYYY-MM-DD/`
+4. **Newer than latest raw folder** → download it into `data/raw/YYYY-MM-DDThh-mm-ssTZ/`
 5. **Same or older** → request a new export
 6. **No raw folders yet** → download the newest ready export (first run)
 
@@ -122,7 +122,7 @@ Logic:
 - [ ] `pull` with no `credentials.json` → clear error about Gmail setup
 - [ ] First `pull` → OAuth consent flow, then browser login + OTP auto-filled
 - [ ] Export not ready → requests export, prints "try again in ~48 hours"
-- [ ] New export ready → downloads ZIP, extracts CSVs to `data/raw/YYYY-MM-DD/`
+- [ ] New export ready → downloads ZIP, extracts CSVs to `data/raw/YYYY-MM-DDThh-mm-ssTZ/`
 - [ ] Same export already in `data/raw/` → requests new export instead of re-downloading
 - [ ] Import runs automatically after download, prints record counts
 - [ ] `--no-import` skips import step

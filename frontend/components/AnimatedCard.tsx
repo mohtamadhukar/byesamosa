@@ -17,8 +17,7 @@ export default function AnimatedCard({
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay, ease: "easeOut" }}
       className={`bg-white rounded-xl shadow-sm border border-warm-200/50 p-6 ${className}`}
     >

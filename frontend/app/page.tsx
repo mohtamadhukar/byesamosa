@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Header from "@/components/Header";
+import DataStatus from "@/components/DataStatus";
 import ScoreCardsRow from "@/components/ScoreCardsRow";
 import AIBriefing from "@/components/AIBriefing";
 import Vitals from "@/components/Vitals";
@@ -14,12 +15,14 @@ import {
   fetchBaselines,
   fetchWorkouts,
   refreshInsight,
+  fetchDataStatus,
 } from "@/lib/api";
 import type {
   DashboardResponse,
   TrendsResponse,
   BaselinePoint,
   WorkoutRecoveryResponse,
+  DataStatusResponse,
 } from "@/lib/types";
 
 export default function Home() {
@@ -27,6 +30,7 @@ export default function Home() {
   const [trends, setTrends] = useState<TrendsResponse | null>(null);
   const [baselines, setBaselines] = useState<BaselinePoint[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutRecoveryResponse | null>(null);
+  const [dataStatus, setDataStatus] = useState<DataStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,16 +38,18 @@ export default function Home() {
     try {
       setLoading(true);
       setError(null);
-      const [dash, tr, bl, wo] = await Promise.all([
+      const [dash, tr, bl, wo, ds] = await Promise.all([
         fetchDashboard(),
         fetchTrends(30),
         fetchBaselines("sleep_score"),
         fetchWorkouts(30),
+        fetchDataStatus(),
       ]);
       setDashboard(dash);
       setTrends(tr);
       setBaselines(bl);
       setWorkouts(wo);
+      setDataStatus(ds);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load data");
     } finally {
@@ -61,6 +67,10 @@ export default function Home() {
       prev ? { ...prev, insight: newInsight } : prev
     );
   }, []);
+
+  const handlePullComplete = useCallback(() => {
+    loadData();
+  }, [loadData]);
 
   if (loading) {
     return (
@@ -107,6 +117,8 @@ export default function Home() {
   return (
     <main className="min-h-screen max-w-6xl mx-auto px-6 py-10">
       <Header day={dashboard.latest.day} onRefresh={handleRefresh} />
+
+      <DataStatus data={dataStatus} onPullComplete={handlePullComplete} />
 
       <ScoreCardsRow data={dashboard} />
 

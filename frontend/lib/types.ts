@@ -83,6 +83,8 @@ export interface DailySleep {
   average_breath: number | null;
   lowest_heart_rate: number | null;
   temperature_deviation: number | null;
+  bedtime_start: string | null;
+  bedtime_end: string | null;
 }
 
 export interface DailyReadiness {
@@ -161,6 +163,7 @@ export interface PullStatusResponse {
 export interface RawExport {
   date: string;
   file_count: number;
+  pulled_at: string | null;
 }
 
 export interface DataStatusResponse {

@@ -14,6 +14,7 @@ router = APIRouter()
 class RawExport(BaseModel):
     date: str
     file_count: int
+    pulled_at: str | None = None
 
 
 class ProcessedRange(BaseModel):
@@ -26,17 +27,29 @@ class DataStatusResponse(BaseModel):
     processed_range: ProcessedRange | None
 
 
+_TS_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:T(\d{2})-(\d{2})-(\d{2})(\w+))?$")
+
+
 def _scan_raw_exports(raw_dir: Path) -> list[RawExport]:
-    """Find date-named directories under data/raw/ and count CSVs in each."""
+    """Find date-named directories under data/raw/ and count CSVs in each.
+
+    Supports legacy "YYYY-MM-DD" and timestamped "YYYY-MM-DDThh-mm-ssTZ" names.
+    """
     if not raw_dir.exists():
         return []
-    date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
     exports = []
     for entry in sorted(raw_dir.iterdir(), reverse=True):
-        if entry.is_dir() and date_pattern.match(entry.name):
-            csv_count = len(list(entry.glob("*.csv")))
-            if csv_count > 0:
-                exports.append(RawExport(date=entry.name, file_count=csv_count))
+        if not entry.is_dir():
+            continue
+        m = _TS_PATTERN.match(entry.name)
+        if not m:
+            continue
+        csv_count = len(list(entry.glob("*.csv")))
+        if csv_count == 0:
+            continue
+        date_part, h, mi, s, tz = m.groups()
+        pulled_at = f"{date_part}T{h}:{mi}:{s} {tz}" if h else None
+        exports.append(RawExport(date=date_part, file_count=csv_count, pulled_at=pulled_at))
     return exports
 
 

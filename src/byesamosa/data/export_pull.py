@@ -12,6 +12,13 @@ import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
+
+def _pull_dir_name(export_date: date) -> str:
+    """Build a timestamped directory name: YYYY-MM-DDThh-mm-ssTZ."""
+    now = datetime.now()
+    tz_abbr = time.strftime("%Z")
+    return f"{export_date.isoformat()}T{now.strftime('%H-%M-%S')}{tz_abbr}"
+
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
@@ -41,7 +48,10 @@ OTP_REDIRECT_MAX_POLLS = 30
 
 
 def _get_latest_raw_date(raw_dir: Path) -> date | None:
-    """Find the latest date-stamped folder in data/raw/."""
+    """Find the latest date-stamped folder in data/raw/.
+
+    Supports both legacy "YYYY-MM-DD" and timestamped "YYYY-MM-DDThh-mm-ssTZ" names.
+    """
     if not raw_dir.exists():
         return None
 
@@ -49,7 +59,7 @@ def _get_latest_raw_date(raw_dir: Path) -> date | None:
     for folder in raw_dir.iterdir():
         if folder.is_dir():
             try:
-                dates.append(date.fromisoformat(folder.name))
+                dates.append(date.fromisoformat(folder.name[:10]))
             except ValueError:
                 continue
 
@@ -217,7 +227,7 @@ def pull_oura_export(
                 match = [r for r in ready_rows if r["date"] == target_date]
                 if match:
                     print(f"Downloading requested export from {target_date}.")
-                    export_dir = raw_dir / match[0]["date"].isoformat()
+                    export_dir = raw_dir / _pull_dir_name(match[0]["date"])
                     return _download_export(page, match[0], export_dir)
                 else:
                     available = [r["date"].isoformat() for r in ready_rows]
@@ -244,7 +254,7 @@ def pull_oura_export(
                 print("No ready exports found. Requesting new export.")
 
             if should_download and target_row is not None:
-                export_dir = raw_dir / target_row["date"].isoformat()
+                export_dir = raw_dir / _pull_dir_name(target_row["date"])
                 return _download_export(page, target_row, export_dir)
             else:
                 _request_new_export(page)

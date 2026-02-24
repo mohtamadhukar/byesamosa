@@ -7,6 +7,7 @@ import type { ScoreInsight } from "@/lib/types";
 
 interface ScoreCardProps {
   label: string;
+  subtitle?: string;
   score: number | null;
   delta?: number;
   contributors: Record<string, number | null> | object | null;
@@ -17,6 +18,7 @@ interface ScoreCardProps {
 
 export default function ScoreCard({
   label,
+  subtitle,
   score,
   delta,
   contributors,
@@ -30,6 +32,9 @@ export default function ScoreCard({
         <p className="text-sm font-medium text-warm-800/60 uppercase tracking-wide">
           {label}
         </p>
+        {subtitle && (
+          <p className="text-xs text-warm-800/40 mt-0.5">{subtitle}</p>
+        )}
         <p
           className="text-5xl font-bold mt-1"
           style={{ color: scoreColor(score) }}

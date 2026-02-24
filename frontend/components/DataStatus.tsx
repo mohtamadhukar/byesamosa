@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatPulledAt } from "@/lib/utils";
 import type { DataStatusResponse } from "@/lib/types";
 import PullButton from "./PullButton";
 
@@ -62,6 +62,11 @@ export default function DataStatus({ data, onPullComplete }: DataStatusProps) {
                   <span className="text-warm-800/50 ml-1.5">
                     {exp.file_count} file{exp.file_count !== 1 ? "s" : ""}
                   </span>
+                  {exp.pulled_at && (
+                    <span className="text-warm-800/40 block text-xs mt-0.5">
+                      pulled {formatPulledAt(exp.pulled_at)}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

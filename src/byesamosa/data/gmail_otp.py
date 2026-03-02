@@ -42,8 +42,11 @@ def fetch_oura_otp(sent_after: float | None = None, timeout_seconds: int = 120) 
 
     if sent_after is None:
         sent_after = time.time() - 60
-    # No tolerance — only accept emails strictly after the cutoff.
-    # The new OTP email will have a timestamp after sent_after.
+    else:
+        # Allow 30s tolerance for clock skew between local machine and
+        # Oura's email server — the Date header may predate our local
+        # time.time() if the server clock runs slightly ahead.
+        sent_after -= 30
 
     print("Waiting for Oura OTP email...")
     start = time.time()

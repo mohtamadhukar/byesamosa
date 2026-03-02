@@ -9,9 +9,10 @@ interface PullButtonProps {
 
 export default function PullButton({ onComplete }: PullButtonProps) {
   const [status, setStatus] = useState<
-    "idle" | "running" | "completed" | "failed"
+    "idle" | "running" | "completed" | "failed" | "requested"
   >("idle");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -26,12 +27,21 @@ export default function PullButton({ onComplete }: PullButtonProps) {
     intervalRef.current = setInterval(async () => {
       try {
         const res = await fetchPullStatus();
-        setStatus(res.status);
         if (res.status === "completed") {
           stopPolling();
-          onComplete();
-          // Reset to idle after showing "Done!" briefly
-          setTimeout(() => setStatus("idle"), 3000);
+          // Check if the output indicates an export was requested (not downloaded)
+          if (res.output?.includes("Export has been requested")) {
+            setStatus("requested");
+            setMessage("Export requested — check back in ~48 hours");
+            setTimeout(() => {
+              setStatus("idle");
+              setMessage(null);
+            }, 8000);
+          } else {
+            setStatus("completed");
+            onComplete();
+            setTimeout(() => setStatus("idle"), 3000);
+          }
         } else if (res.status === "failed") {
           stopPolling();
           setError("Pull failed. Check server logs.");
@@ -39,6 +49,8 @@ export default function PullButton({ onComplete }: PullButtonProps) {
             setStatus("idle");
             setError(null);
           }, 5000);
+        } else {
+          setStatus(res.status);
         }
       } catch {
         stopPolling();
@@ -65,6 +77,7 @@ export default function PullButton({ onComplete }: PullButtonProps) {
   const handleClick = useCallback(async () => {
     if (status === "running") return;
     setError(null);
+    setMessage(null);
     try {
       await triggerPull();
       setStatus("running");
@@ -90,10 +103,13 @@ export default function PullButton({ onComplete }: PullButtonProps) {
           </span>
         ) : status === "completed" ? (
           "Done!"
+        ) : status === "requested" ? (
+          "Requested"
         ) : (
           "Pull Data"
         )}
       </button>
+      {message && <p className="text-xs text-warm-800/60">{message}</p>}
       {error && <p className="text-xs text-terracotta">{error}</p>}
     </div>
   );

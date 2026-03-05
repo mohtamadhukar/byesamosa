@@ -23,35 +23,35 @@ cp .env.example .env
 ### Running the Application
 ```bash
 # Start both FastAPI backend (port 8000) + Next.js frontend (port 3000)
-python -m byesamosa.pipeline serve
+uv run python -m byesamosa.pipeline serve
 
 # Or run them separately:
-uvicorn byesamosa.api.main:app --reload          # FastAPI on :8000
+uv run uvicorn byesamosa.api.main:app --reload    # FastAPI on :8000
 cd frontend && npm run dev                         # Next.js on :3000
 
 # Pull Oura export via browser automation
-python -m byesamosa.pipeline pull
+uv run python -m byesamosa.pipeline pull
 ```
 
 ### Data Operations
 ```bash
 # Pull Oura export via browser automation (requires playwright install chromium)
-python -m byesamosa.pipeline pull
-python -m byesamosa.pipeline pull --no-import
-python -m byesamosa.pipeline pull --date 2026-02-23
+uv run python -m byesamosa.pipeline pull
+uv run python -m byesamosa.pipeline pull --no-import
+uv run python -m byesamosa.pipeline pull --date 2026-02-23
 
 # Import Oura CSV export (place exported CSVs in a dated directory under data/raw/)
-python -m byesamosa.pipeline import --raw-dir data/raw/YYYY-MM-DDThh-mm-ssTZ
+uv run python -m byesamosa.pipeline import --raw-dir data/raw/YYYY-MM-DDThh-mm-ssTZ
 
 # Compute/recompute baselines (rolling averages)
-python -c "from byesamosa.data.store import DataStore; from byesamosa.data.queries import compute_baselines; from pathlib import Path; compute_baselines(DataStore(Path('data')))"
+uv run python -c "from byesamosa.data.store import DataStore; from byesamosa.data.queries import compute_baselines; from pathlib import Path; compute_baselines(DataStore(Path('data')))"
 ```
 
 ### Testing
 ```bash
-pytest tests/
-pytest tests/test_queries.py
-pytest -v
+uv run pytest tests/
+uv run pytest tests/test_queries.py
+uv run pytest -v
 ```
 
 ## Architecture

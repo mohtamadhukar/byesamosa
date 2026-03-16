@@ -30,6 +30,13 @@ class PullResult:
     message: str               # Human-readable explanation
 
 
+@dataclass
+class PullResult:
+    path: Path | None          # Extracted CSV dir, or None
+    status: str                # "downloaded" | "requested" | "processing" | "request_failed"
+    message: str               # Human-readable explanation
+
+
 def _pull_dir_name(export_date: date) -> str:
     """Build a timestamped directory name: YYYY-MM-DDThh-mm-ssTZ."""
     now = datetime.now()

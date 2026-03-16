@@ -188,7 +188,7 @@ def _load_oura_email() -> str:
     return email
 
 
-def _log_pull(raw_dir: Path, result: PullResult, exports_found: dict) -> None:
+def _log_pull(raw_dir: Path, result: PullResult, exports_found: dict, latest_raw: date | None = None) -> None:
     """Append a pull event to data/logs/pull_history.json."""
     logs_dir = raw_dir.parent / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -197,6 +197,7 @@ def _log_pull(raw_dir: Path, result: PullResult, exports_found: dict) -> None:
     entry = {
         "timestamp": datetime.now().astimezone().isoformat(),
         "exports_found": exports_found,
+        "latest_raw": latest_raw.isoformat() if latest_raw else None,
         "action": result.status,
         "export_date": result.path.name[:10] if result.path else None,
         "message": result.message,
@@ -256,7 +257,9 @@ def pull_oura_export(
             export_rows = _parse_export_rows(page)
 
             ready = [r for r in export_rows if r["ready"]]
+            ready.sort(key=lambda r: r["date"], reverse=True)
             processing = [r for r in export_rows if not r["ready"]]
+            processing.sort(key=lambda r: r["date"], reverse=True)
             ready_dates = ", ".join(r["date"].strftime("%m/%d") for r in ready)
             proc_dates = ", ".join(r["date"].strftime("%m/%d") for r in processing)
             print(f"Found {len(export_rows)} exports: {len(ready)} ready ({ready_dates}), {len(processing)} processing ({proc_dates})")
@@ -268,31 +271,27 @@ def pull_oura_export(
 
             latest_raw = _get_latest_raw_date(raw_dir)
 
-            # Find newest ready export
-            ready_rows = [r for r in export_rows if r["ready"]]
-            ready_rows.sort(key=lambda r: r["date"], reverse=True)
-
             if target_date is not None:
                 # Download a specific export by date
-                match = [r for r in ready_rows if r["date"] == target_date]
+                match = [r for r in ready if r["date"] == target_date]
                 if match:
                     print(f"Downloading requested export from {target_date}.")
                     export_dir = raw_dir / _pull_dir_name(match[0]["date"])
                     path = _download_export(page, match[0], export_dir)
                     result = PullResult(path=path, status="downloaded", message=f"Downloaded export from {target_date}.")
-                    _log_pull(raw_dir, result, exports_found)
+                    _log_pull(raw_dir, result, exports_found, latest_raw)
                     return result
                 else:
-                    available = [r["date"].isoformat() for r in ready_rows]
+                    available = [r["date"].isoformat() for r in ready]
                     msg = f"No ready export for {target_date}. Available: {available}"
                     print(msg)
                     result = PullResult(path=None, status="request_failed", message=msg)
-                    _log_pull(raw_dir, result, exports_found)
+                    _log_pull(raw_dir, result, exports_found, latest_raw)
                     return result
 
             # Auto-detection path
-            if ready_rows:
-                newest_ready = ready_rows[0]
+            if ready:
+                newest_ready = ready[0]
 
                 if latest_raw is None or newest_ready["date"] > latest_raw:
                     # Download the newest ready export
@@ -304,7 +303,7 @@ def pull_oura_export(
                     export_dir = raw_dir / _pull_dir_name(newest_ready["date"])
                     path = _download_export(page, newest_ready, export_dir)
                     result = PullResult(path=path, status="downloaded", message=f"Downloaded export from {newest_ready['date']}.")
-                    _log_pull(raw_dir, result, exports_found)
+                    _log_pull(raw_dir, result, exports_found, latest_raw)
                     return result
                 else:
                     # newest ready <= latest_raw
@@ -313,7 +312,7 @@ def pull_oura_export(
                         msg = f"Export from {proc_date} is being prepared — check back later."
                         print(msg)
                         result = PullResult(path=None, status="processing", message=msg)
-                        _log_pull(raw_dir, result, exports_found)
+                        _log_pull(raw_dir, result, exports_found, latest_raw)
                         return result
                     else:
                         print(f"Latest export ({newest_ready['date']}) already imported ({latest_raw}). Requesting new export.")
@@ -322,7 +321,7 @@ def pull_oura_export(
                             result = PullResult(path=None, status="requested", message="Export requested. Try again in ~48 hours.")
                         else:
                             result = PullResult(path=None, status="request_failed", message="Export request may not have gone through.")
-                        _log_pull(raw_dir, result, exports_found)
+                        _log_pull(raw_dir, result, exports_found, latest_raw)
                         return result
             else:
                 # No ready exports
@@ -331,7 +330,7 @@ def pull_oura_export(
                     msg = f"Export from {proc_date} is being prepared — check back later."
                     print(msg)
                     result = PullResult(path=None, status="processing", message=msg)
-                    _log_pull(raw_dir, result, exports_found)
+                    _log_pull(raw_dir, result, exports_found, latest_raw)
                     return result
                 else:
                     print("No ready exports found. Requesting new export.")
@@ -340,17 +339,19 @@ def pull_oura_export(
                         result = PullResult(path=None, status="requested", message="Export requested. Try again in ~48 hours.")
                     else:
                         result = PullResult(path=None, status="request_failed", message="Export request may not have gone through.")
-                    _log_pull(raw_dir, result, exports_found)
+                    _log_pull(raw_dir, result, exports_found, latest_raw)
                     return result
 
         except PlaywrightTimeout as e:
             print(f"Browser operation timed out: {e}")
             print("Try running the command again. If the issue persists, check your internet connection.")
             result = PullResult(path=None, status="request_failed", message=str(e))
+            _log_pull(raw_dir, result, {})
             return result
         except PlaywrightError as e:
             print(f"Browser error: {e}")
             result = PullResult(path=None, status="request_failed", message=str(e))
+            _log_pull(raw_dir, result, {})
             return result
         finally:
             browser.close()
@@ -423,8 +424,8 @@ def _request_new_export(page, pre_rows: list[dict]) -> bool:
 
     # Re-parse and verify
     post_rows = _parse_export_rows(page)
-    pre_dates = {r["date"] for r in pre_rows}
-    new_processing = [r for r in post_rows if not r["ready"] and r["date"] not in pre_dates]
+    pre_processing_dates = {r["date"] for r in pre_rows if not r["ready"]}
+    new_processing = [r for r in post_rows if not r["ready"] and r["date"] not in pre_processing_dates]
     if new_processing:
         print(f"Confirmed: new export requested (processing, date {new_processing[0]['date']}).")
         return True

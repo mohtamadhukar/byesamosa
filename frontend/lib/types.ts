@@ -158,6 +158,7 @@ export interface WorkoutRecoveryResponse {
 export interface PullStatusResponse {
   status: 'idle' | 'running' | 'completed' | 'failed';
   output: string;
+  pull_result?: 'downloaded' | 'requested' | 'processing' | 'request_failed' | null;
 }
 
 export interface RawExport {

@@ -170,12 +170,11 @@ def cmd_pull(args: argparse.Namespace, settings: Settings) -> None:
             email=settings.oura_email,
             raw_dir=raw_dir,
             target_date=target_date,
+            data_dir=settings.data_dir,
         )
     except Exception:
         logger.exception("Pull failed unexpectedly")
         raise
-
-    print(result.message)
 
     if result.status == "downloaded" and result.path is not None:
         print(f"Export downloaded to {result.path}")

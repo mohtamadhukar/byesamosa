@@ -12,7 +12,22 @@ import time
 import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Literal
 from pathlib import Path
+
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+
+from byesamosa.data.gmail_otp import fetch_oura_otp
+
+PullStatus = Literal["downloaded", "requested", "processing", "request_failed"]
+
+
+@dataclass(frozen=True)
+class PullResult:
+    path: Path | None          # Extracted CSV dir, or None
+    status: PullStatus
+    message: str               # Human-readable explanation
 
 
 @dataclass
@@ -28,10 +43,6 @@ def _pull_dir_name(export_date: date) -> str:
     tz_abbr = time.strftime("%Z")
     return f"{export_date.isoformat()}T{now.strftime('%H-%M-%S')}{tz_abbr}"
 
-from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
-
-from byesamosa.data.gmail_otp import fetch_oura_otp
 
 OURA_EXPORT_URL = "https://membership.ouraring.com/data-export"
 
@@ -188,9 +199,9 @@ def _load_oura_email() -> str:
     return email
 
 
-def _log_pull(raw_dir: Path, result: PullResult, exports_found: dict, latest_raw: date | None = None) -> None:
+def _log_pull(data_dir: Path, result: PullResult, exports_found: dict | None, latest_raw: date | None = None) -> None:
     """Append a pull event to data/logs/pull_history.json."""
-    logs_dir = raw_dir.parent / "logs"
+    logs_dir = data_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_file = logs_dir / "pull_history.json"
 
@@ -214,8 +225,29 @@ def _log_pull(raw_dir: Path, result: PullResult, exports_found: dict, latest_raw
     log_file.write_text(json.dumps(history, indent=2) + "\n")
 
 
+def _handle_no_new_export(
+    page, processing: list[dict], export_rows: list[dict],
+    exports_found: dict, latest_raw: date | None, log_dir: Path,
+) -> PullResult:
+    """Handle case where no new download is available: return processing status or request new."""
+    if processing:
+        proc_date = processing[0]["date"]
+        msg = f"Export from {proc_date} is being prepared — check back later."
+        print(msg)
+        result = PullResult(path=None, status="processing", message=msg)
+    else:
+        confirmed = _request_new_export(page, export_rows)
+        if confirmed:
+            result = PullResult(path=None, status="requested", message="Export requested. Try again in ~48 hours.")
+        else:
+            result = PullResult(path=None, status="request_failed", message="Export request may not have gone through.")
+    _log_pull(log_dir, result, exports_found, latest_raw)
+    return result
+
+
 def pull_oura_export(
     email: str, raw_dir: Path, target_date: date | None = None,
+    *, data_dir: Path | None = None,
 ) -> PullResult:
     """Automate Oura export download via Playwright.
 
@@ -228,6 +260,7 @@ def pull_oura_export(
         PullResult with path to extracted CSV directory, status, and message.
     """
     _validate_download_dir(raw_dir)
+    log_dir = data_dir if data_dir is not None else raw_dir.parent
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
@@ -279,14 +312,14 @@ def pull_oura_export(
                     export_dir = raw_dir / _pull_dir_name(match[0]["date"])
                     path = _download_export(page, match[0], export_dir)
                     result = PullResult(path=path, status="downloaded", message=f"Downloaded export from {target_date}.")
-                    _log_pull(raw_dir, result, exports_found, latest_raw)
+                    _log_pull(log_dir, result, exports_found, latest_raw)
                     return result
                 else:
                     available = [r["date"].isoformat() for r in ready]
                     msg = f"No ready export for {target_date}. Available: {available}"
                     print(msg)
                     result = PullResult(path=None, status="request_failed", message=msg)
-                    _log_pull(raw_dir, result, exports_found, latest_raw)
+                    _log_pull(log_dir, result, exports_found, latest_raw)
                     return result
 
             # Auto-detection path
@@ -303,55 +336,29 @@ def pull_oura_export(
                     export_dir = raw_dir / _pull_dir_name(newest_ready["date"])
                     path = _download_export(page, newest_ready, export_dir)
                     result = PullResult(path=path, status="downloaded", message=f"Downloaded export from {newest_ready['date']}.")
-                    _log_pull(raw_dir, result, exports_found, latest_raw)
+                    _log_pull(log_dir, result, exports_found, latest_raw)
                     return result
                 else:
                     # newest ready <= latest_raw
-                    if processing:
-                        proc_date = processing[0]["date"]
-                        msg = f"Export from {proc_date} is being prepared — check back later."
-                        print(msg)
-                        result = PullResult(path=None, status="processing", message=msg)
-                        _log_pull(raw_dir, result, exports_found, latest_raw)
-                        return result
-                    else:
+                    if not processing:
                         print(f"Latest export ({newest_ready['date']}) already imported ({latest_raw}). Requesting new export.")
-                        confirmed = _request_new_export(page, export_rows)
-                        if confirmed:
-                            result = PullResult(path=None, status="requested", message="Export requested. Try again in ~48 hours.")
-                        else:
-                            result = PullResult(path=None, status="request_failed", message="Export request may not have gone through.")
-                        _log_pull(raw_dir, result, exports_found, latest_raw)
-                        return result
+                    return _handle_no_new_export(page, processing, export_rows, exports_found, latest_raw, log_dir)
             else:
                 # No ready exports
-                if processing:
-                    proc_date = processing[0]["date"]
-                    msg = f"Export from {proc_date} is being prepared — check back later."
-                    print(msg)
-                    result = PullResult(path=None, status="processing", message=msg)
-                    _log_pull(raw_dir, result, exports_found, latest_raw)
-                    return result
-                else:
+                if not processing:
                     print("No ready exports found. Requesting new export.")
-                    confirmed = _request_new_export(page, export_rows)
-                    if confirmed:
-                        result = PullResult(path=None, status="requested", message="Export requested. Try again in ~48 hours.")
-                    else:
-                        result = PullResult(path=None, status="request_failed", message="Export request may not have gone through.")
-                    _log_pull(raw_dir, result, exports_found, latest_raw)
-                    return result
+                return _handle_no_new_export(page, processing, export_rows, exports_found, latest_raw, log_dir)
 
         except PlaywrightTimeout as e:
             print(f"Browser operation timed out: {e}")
             print("Try running the command again. If the issue persists, check your internet connection.")
             result = PullResult(path=None, status="request_failed", message=str(e))
-            _log_pull(raw_dir, result, {})
+            _log_pull(log_dir, result, None)
             return result
         except PlaywrightError as e:
             print(f"Browser error: {e}")
             result = PullResult(path=None, status="request_failed", message=str(e))
-            _log_pull(raw_dir, result, {})
+            _log_pull(log_dir, result, None)
             return result
         finally:
             browser.close()

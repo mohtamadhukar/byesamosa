@@ -9,7 +9,7 @@ interface PullButtonProps {
 
 export default function PullButton({ onComplete }: PullButtonProps) {
   const [status, setStatus] = useState<
-    "idle" | "running" | "completed" | "failed" | "requested"
+    "idle" | "running" | "completed" | "failed" | "requested" | "processing"
   >("idle");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -30,7 +30,21 @@ export default function PullButton({ onComplete }: PullButtonProps) {
         if (res.status === "completed") {
           stopPolling();
           // Check if the output indicates an export was requested (not downloaded)
-          if (res.output?.includes("Export has been requested")) {
+          if (res.output?.includes("is being prepared")) {
+            setStatus("processing");
+            setMessage("Export is being prepared — check back later");
+            setTimeout(() => {
+              setStatus("idle");
+              setMessage(null);
+            }, 8000);
+          } else if (res.output?.includes("request may not have gone through")) {
+            setStatus("failed");
+            setError("Export request may not have gone through. Try requesting manually.");
+            setTimeout(() => {
+              setStatus("idle");
+              setError(null);
+            }, 8000);
+          } else if (res.output?.includes("Export has been requested")) {
             setStatus("requested");
             setMessage("Export requested — check back in ~48 hours");
             setTimeout(() => {
@@ -105,6 +119,8 @@ export default function PullButton({ onComplete }: PullButtonProps) {
           "Done!"
         ) : status === "requested" ? (
           "Requested"
+        ) : status === "processing" ? (
+          "Processing"
         ) : (
           "Pull Data"
         )}

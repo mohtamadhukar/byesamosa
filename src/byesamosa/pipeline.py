@@ -166,7 +166,7 @@ def cmd_pull(args: argparse.Namespace, settings: Settings) -> None:
 
     print(f"Pulling Oura export for {settings.oura_email}...")
     try:
-        result_path = pull_oura_export(
+        result = pull_oura_export(
             email=settings.oura_email,
             raw_dir=raw_dir,
             target_date=target_date,
@@ -175,29 +175,31 @@ def cmd_pull(args: argparse.Namespace, settings: Settings) -> None:
         logger.exception("Pull failed unexpectedly")
         raise
 
-    if result_path is None:
-        print("No new export ready. Export has been requested, try again in ~48 hours.")
-        return
+    print(result.message)
 
-    print(f"Export downloaded to {result_path}")
+    if result.status == "downloaded" and result.path is not None:
+        print(f"Export downloaded to {result.path}")
 
-    if args.no_import:
-        print("Skipping import (--no-import).")
-        return
+        if args.no_import:
+            print("Skipping import (--no-import).")
+            return
 
-    # Run the import pipeline on the downloaded CSVs
-    from byesamosa.data.importer import import_oura_export
-
-    summary = import_oura_export(
-        raw_dir=result_path,
-        data_dir=settings.data_dir,
-        refresh=False,
-    )
-
-    print("Import complete:")
-    for dtype, count in summary.items():
-        print(f"  {dtype}: {count}")
-    print(f"  total: {sum(summary.values())}")
+        from byesamosa.data.importer import import_oura_export
+        summary = import_oura_export(
+            raw_dir=result.path,
+            data_dir=settings.data_dir,
+            refresh=False,
+        )
+        print("Import complete:")
+        for dtype, count in summary.items():
+            print(f"  {dtype}: {count}")
+        print(f"  total: {sum(summary.values())}")
+    elif result.status == "requested":
+        print("Export has been requested, try again in ~48 hours.")
+    elif result.status == "processing":
+        print("Export is being prepared, try again later.")
+    elif result.status == "request_failed":
+        print("Warning: export request may not have gone through. Try requesting manually at membership.ouraring.com/data-export")
 
 
 def cmd_serve(args: argparse.Namespace, settings: Settings) -> None:
